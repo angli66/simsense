@@ -1,0 +1,14 @@
+#ifndef COST_H
+#define COST_H
+
+#include <stdint.h>
+#include "config.h"
+
+namespace simsense {
+
+__global__
+void hammingCost(const uint32_t *censusL, const uint32_t *censusR, cost_t *d_cost, const int rows, const int cols, const int len);
+
+}
+
+#endif

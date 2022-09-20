@@ -1,0 +1,117 @@
+#include "camera.h"
+
+namespace simsense {
+
+__device__ __forceinline__ float atomicMinFloat(float *addr, float value) {
+    float old;
+    old = (value >= 0) ? __int_as_float(atomicMin((int *)addr, __float_as_int(value))) :
+        __uint_as_float(atomicMax((unsigned int *)addr, __float_as_uint(value)));
+    return old;
+}
+
+__global__
+void remap(const float *mapx, const float *mapy, const uint8_t *src, uint8_t *dst, const int rows, const int cols) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= rows * cols) { return; }
+    float sx = mapx[pos];
+    float sy = mapy[pos];
+
+    // Eliminate error
+    if (sx - round(sx) <= ERROR_MARGIN || round(sx) - sx <= ERROR_MARGIN) { sx = round(sx); }
+    if (sy - round(sy) <= ERROR_MARGIN || round(sy) - sy <= ERROR_MARGIN) { sy = round(sy); }
+
+    // Fit the mapped point into boundary
+    if (sx < 0) { sx = 0; }
+    if (sx > cols - 1) { sx = cols - 1; }
+    if (sy < 0) { sy = 0; }
+    if (sy > rows - 1) { sy = rows - 1; }
+
+    // Bilinear interpolation, with BORDER_VALUE for pixels out of image boundary
+    int x1 = floor(sx);
+    int x2 = floor(sx)+1;
+    int y1 = floor(sy);
+    int y2 = floor(sy)+1;
+    int I11 = (x1 < 0 || x1 >= cols || y1 < 0 || y1 >= rows) ? BORDER_VALUE : src[y1*cols+x1];
+    int I12 = (x1 < 0 || x1 >= cols || y2 < 0 || y2 >= rows) ? BORDER_VALUE : src[y2*cols+x1];
+    int I21 = (x2 < 0 || x2 >= cols || y1 < 0 || y1 >= rows) ? BORDER_VALUE : src[y1*cols+x2];
+    int I22 = (x2 < 0 || x2 >= cols || y2 < 0 || y2 >= rows) ? BORDER_VALUE : src[y2*cols+x2];
+
+    dst[pos] = (uint8_t)round(
+        (x2-sx)*(y2-sy)*I11 +
+        (x2-sx)*(sy-y1)*I12 +
+        (sx-x1)*(y2-sy)*I21 +
+        (sx-x1)*(sy-y1)*I22
+    );
+}
+
+__global__
+void disp2Depth(const float *disp, float *depth, const int size, const float focalLen, const float baselineLen) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= size) { return; }
+
+    depth[pos] = (disp[pos] <= 0) ? 0 : focalLen * baselineLen / disp[pos];
+}
+
+__global__
+void initRgbDepth(float *rgbDepth, const int size, const float maxDepth) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= size) { return; }
+
+    rgbDepth[pos] = maxDepth;
+}
+
+__global__
+void depthRegistration(float *rgbDepth, const float *depth, const float *a1, const float *a2, const float *a3,
+                       float b1, float b2, float b3, const int size, const int rgbRows, const int rgbCols) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= size) { return; }
+
+    float z = depth[pos];
+    float zRgb = a3[pos] * z + b3;
+    int x = (int)round((a1[pos] * z + b1) / zRgb);
+    int y = (int)round((a2[pos] * z + b2) / zRgb);
+
+    if (zRgb > 0 && x >= 0 && x < rgbCols && y >= 0 && y < rgbRows) {
+        float *ptr = rgbDepth + y * rgbCols + x;
+        atomicMinFloat(ptr, zRgb); // Update if occluded
+    }
+}
+
+// Dilate in a 2x2 region where the original projected location is in the bottom right of this region.
+__global__
+void depthDilation(float *depth, const int rgbRows, const int rgbCols, const float maxDepth) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= rgbRows * rgbCols) { return; }
+
+    int y = pos / rgbCols;
+    int x = pos % rgbCols;
+    float z = depth[pos];
+
+    // Left
+    if (z < maxDepth && x-1 >= 0) {
+        float *ptr = depth + y * rgbCols + x-1;
+        atomicMinFloat(ptr, z); // Update if occluded
+    }
+
+    // Top
+    if (z < maxDepth && y-1 >= 0) {
+        float *ptr = depth + (y-1) * rgbCols + x;
+        atomicMinFloat(ptr, z); // Update if occluded
+    }
+
+    // Top-left
+    if (z < maxDepth && x-1 >= 0 && y-1 >= 0) {
+        float *ptr = depth + (y-1) * rgbCols + x-1;
+        atomicMinFloat(ptr, z); // Update if occluded
+    }
+}
+
+__global__
+void correctDepthRange(float *depth, const int size, const float minDepth, const float maxDepth) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= size) { return; }
+
+    if (depth[pos] < minDepth || depth[pos] >= maxDepth) { depth[pos] = 0; }
+}
+
+}
