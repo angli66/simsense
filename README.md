@@ -32,7 +32,7 @@ CUDA Toolkit needs to be installed to compile .cu source files. Check https://de
 ## Install
 Before installing, check your NVIDIA GPU's compute capability at https://developer.nvidia.com/cuda-gpus. If your GPU's compute capability is of 7.5, 8.0 or 8.6, simply run
 
-    pip install git+https://github.com/angli66/SimSense.git
+    pip install git+https://github.com/angli66/simsense.git
 
 to build the package with `pip`. Otherwise, check the following **Build Locally** section.
 
