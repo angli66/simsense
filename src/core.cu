@@ -4,29 +4,114 @@ using namespace simsense;
 
 namespace simsense {
 
-static cudaStream_t stream1, stream2, stream3;
-static float *d_mapLx, *d_mapLy, *d_mapRx, *d_mapRy, *d_a1, *d_a2, *d_a3;
-static uint8_t *d_rawim0, *d_rawim1, *d_im0, *d_im1;
-static uint32_t *d_census0, *d_census1;
-static cost_t *d_rawcost, *d_hsum, *d_cost, *d_L0, *d_L1, *d_L2, *d_LAll;
-static float *d_leftDisp, *d_filteredDisp, *d_depth, *d_rgbDepth;
-static uint16_t *d_rightDisp;
-static uint8_t censusWidth, censusHeight, bfWidth, bfHeight, uniqRatio, lrMaxDiff, mfSize;
-static uint32_t rows, cols, size, maxDisp, p1, p2, rgbRows, rgbCols, rgbSize;
-static float focalLen, baselineLen, minDepth, maxDepth, b1, b2, b3;
-static bool rectified, registration, dilation, memoryOccupied, initiated;
+// Constructor without registration
+DepthSensorEngine::DepthSensorEngine(
+        uint32_t _rows, uint32_t _cols, float _focalLen, float _baselineLen, float _minDepth, float _maxDepth, bool _rectified,
+        uint8_t _censusWidth, uint8_t _censusHeight, uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight, uint8_t _p1, uint8_t _p2,
+        uint8_t _uniqRatio, uint8_t _lrMaxDiff, uint8_t _mfSize, py::array_t<float> map_lx, py::array_t<float> map_ly,
+        py::array_t<float> map_rx, py::array_t<float> map_ry
+    ) {
+    // Convert from python to C++
+    Mat2d<float> mapLx = ndarray2Mat2d<float>(map_lx);
+    Mat2d<float> mapLy = ndarray2Mat2d<float>(map_ly);
+    Mat2d<float> mapRx = ndarray2Mat2d<float>(map_rx);
+    Mat2d<float> mapRy = ndarray2Mat2d<float>(map_ry);
 
-void coreInitWithReg(uint32_t _rows, uint32_t _cols, float _focalLen, float _baselineLen, float _minDepth, float _maxDepth, bool _rectified,
-                        uint8_t _censusWidth, uint8_t _censusHeight, uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight, uint8_t _p1, uint8_t _p2,
-                        uint8_t _uniqRatio, uint8_t _lrMaxDiff, uint8_t _mfSize, Mat2d<float> mapLx, Mat2d<float> mapLy, Mat2d<float> mapRx, Mat2d<float> mapRy,
-                        uint32_t _rgbRows, uint32_t _rgbCols, Mat2d<float> a1, Mat2d<float> a2, Mat2d<float> a3, float _b1, float _b2, float _b3, bool _dilation) {
     // Create streams and free memory if necessary
     gpuErrCheck(cudaStreamCreate(&stream1));
     gpuErrCheck(cudaStreamCreate(&stream2));
     gpuErrCheck(cudaStreamCreate(&stream3));
-    if(memoryOccupied) { freeMemory(); }
 
-    // Intialize global variables
+    // Intialize class variables
+    censusWidth = _censusWidth;
+    censusHeight = _censusHeight;
+    bfWidth = _bfWidth;
+    bfHeight = _bfHeight;
+    p1 = _p1 * bfWidth * bfHeight;
+    p2 = _p2 * bfWidth * bfHeight;
+    uniqRatio = _uniqRatio;
+    lrMaxDiff = _lrMaxDiff;
+    mfSize = _mfSize;
+    rows = _rows;
+    cols = _cols;
+    size = rows*cols;
+    maxDisp = _maxDisp;
+    focalLen = _focalLen;
+    baselineLen = _baselineLen;
+    minDepth = _minDepth;
+    maxDepth = _maxDepth;
+    rectified = _rectified;
+    registration = false;
+    int size3d = size*maxDisp;
+
+    // Allocate GPU memory
+    gpuErrCheck(cudaMalloc((void **)&d_mapLx, sizeof(float)*size));
+    gpuErrCheck(cudaMalloc((void **)&d_mapLy, sizeof(float)*size));
+    gpuErrCheck(cudaMalloc((void **)&d_mapRx, sizeof(float)*size));
+    gpuErrCheck(cudaMalloc((void **)&d_mapRy, sizeof(float)*size));
+    gpuErrCheck(cudaMemcpyAsync(d_mapLx, mapLx.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
+    gpuErrCheck(cudaMemcpyAsync(d_mapLy, mapLy.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
+    gpuErrCheck(cudaMemcpyAsync(d_mapRx, mapRx.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
+    gpuErrCheck(cudaMemcpyAsync(d_mapRy, mapRy.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
+
+    if (!rectified) {
+        gpuErrCheck(cudaMalloc((void **)&d_rawim0, sizeof(uint8_t)*size));
+        gpuErrCheck(cudaMalloc((void **)&d_rawim1, sizeof(uint8_t)*size));
+    }
+    gpuErrCheck(cudaMalloc((void **)&d_im0, sizeof(uint8_t)*size));
+    gpuErrCheck(cudaMalloc((void **)&d_im1, sizeof(uint8_t)*size));
+
+    gpuErrCheck(cudaMalloc((void **)&d_census0, sizeof(uint32_t)*size));
+    gpuErrCheck(cudaMalloc((void **)&d_census1, sizeof(uint32_t)*size));
+
+    if (bfWidth * bfHeight != 1) {
+        gpuErrCheck(cudaMalloc((void **)&d_rawcost, sizeof(cost_t)*size3d));
+        gpuErrCheck(cudaMalloc((void **)&d_hsum, sizeof(cost_t)*size3d));
+    }
+    gpuErrCheck(cudaMalloc((void **)&d_cost, sizeof(cost_t)*size3d));
+
+    gpuErrCheck(cudaMalloc((void **)&d_L0, sizeof(cost_t)*size3d));
+    gpuErrCheck(cudaMalloc((void **)&d_L1, sizeof(cost_t)*size3d));
+    gpuErrCheck(cudaMalloc((void **)&d_L2, sizeof(cost_t)*size3d));
+    gpuErrCheck(cudaMalloc((void **)&d_LAll, sizeof(cost_t)*size3d));
+
+    gpuErrCheck(cudaMalloc((void **)&d_leftDisp, sizeof(float)*size));
+    gpuErrCheck(cudaMalloc((void **)&d_rightDisp, sizeof(uint16_t)*size));
+
+    if (mfSize != 1) {
+        gpuErrCheck(cudaMalloc((void **)&d_filteredDisp, sizeof(float)*size));
+    }
+
+#ifndef DISP_ONLY
+    gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
+#endif
+
+    gpuErrCheck(cudaDeviceSynchronize());
+}
+
+// Constructor with registration
+DepthSensorEngine::DepthSensorEngine(
+        uint32_t _rows, uint32_t _cols, uint32_t _rgbRows, uint32_t _rgbCols, float _focalLen, float _baselineLen, float _minDepth,
+        float _maxDepth, bool _rectified, uint8_t _censusWidth, uint8_t _censusHeight, uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight,
+        uint8_t _p1, uint8_t _p2, uint8_t _uniqRatio, uint8_t _lrMaxDiff, uint8_t _mfSize, py::array_t<float> map_lx, py::array_t<float> map_ly,
+        py::array_t<float> map_rx, py::array_t<float> map_ry, py::array_t<float> _a1, py::array_t<float> _a2, py::array_t<float> _a3,
+        float _b1, float _b2, float _b3, bool _dilation
+    ) {
+    // Convert from python to C++
+    Mat2d<float> mapLx = ndarray2Mat2d<float>(map_lx);
+    Mat2d<float> mapLy = ndarray2Mat2d<float>(map_ly);
+    Mat2d<float> mapRx = ndarray2Mat2d<float>(map_rx);
+    Mat2d<float> mapRy = ndarray2Mat2d<float>(map_ry);
+    Mat2d<float> a1 = ndarray2Mat2d<float>(_a1);
+    Mat2d<float> a2 = ndarray2Mat2d<float>(_a2);
+    Mat2d<float> a3 = ndarray2Mat2d<float>(_a3);
+
+    // Create streams and free memory if necessary
+    gpuErrCheck(cudaStreamCreate(&stream1));
+    gpuErrCheck(cudaStreamCreate(&stream2));
+    gpuErrCheck(cudaStreamCreate(&stream3));
+
+    // Intialize class variables
     censusWidth = _censusWidth;
     censusHeight = _censusHeight;
     bfWidth = _bfWidth;
@@ -106,89 +191,13 @@ void coreInitWithReg(uint32_t _rows, uint32_t _cols, float _focalLen, float _bas
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
-    memoryOccupied = true;
-    initiated = true;
 }
 
-void coreInitWithoutReg(uint32_t _rows, uint32_t _cols, float _focalLen, float _baselineLen, float _minDepth, float _maxDepth, bool _rectified,
-                        uint8_t _censusWidth, uint8_t _censusHeight, uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight, uint8_t _p1, uint8_t _p2,
-                        uint8_t _uniqRatio, uint8_t _lrMaxDiff, uint8_t _mfSize, Mat2d<float> mapLx, Mat2d<float> mapLy, Mat2d<float> mapRx, Mat2d<float> mapRy) {
-    // Create streams and free memory if necessary
-    gpuErrCheck(cudaStreamCreate(&stream1));
-    gpuErrCheck(cudaStreamCreate(&stream2));
-    gpuErrCheck(cudaStreamCreate(&stream3));
-    if(memoryOccupied) { freeMemory(); }
+py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray, py::array_t<uint8_t> right_ndarray) {
+    // Convert from python to C++
+    Mat2d<uint8_t> left = ndarray2Mat2d<uint8_t>(left_ndarray);
+    Mat2d<uint8_t> right = ndarray2Mat2d<uint8_t>(right_ndarray);
 
-    // Intialize global variables
-    censusWidth = _censusWidth;
-    censusHeight = _censusHeight;
-    bfWidth = _bfWidth;
-    bfHeight = _bfHeight;
-    p1 = _p1 * bfWidth * bfHeight;
-    p2 = _p2 * bfWidth * bfHeight;
-    uniqRatio = _uniqRatio;
-    lrMaxDiff = _lrMaxDiff;
-    mfSize = _mfSize;
-    rows = _rows;
-    cols = _cols;
-    size = rows*cols;
-    maxDisp = _maxDisp;
-    focalLen = _focalLen;
-    baselineLen = _baselineLen;
-    minDepth = _minDepth;
-    maxDepth = _maxDepth;
-    rectified = _rectified;
-    int size3d = size*maxDisp;
-
-    // Allocate GPU memory
-    gpuErrCheck(cudaMalloc((void **)&d_mapLx, sizeof(float)*size));
-    gpuErrCheck(cudaMalloc((void **)&d_mapLy, sizeof(float)*size));
-    gpuErrCheck(cudaMalloc((void **)&d_mapRx, sizeof(float)*size));
-    gpuErrCheck(cudaMalloc((void **)&d_mapRy, sizeof(float)*size));
-    gpuErrCheck(cudaMemcpyAsync(d_mapLx, mapLx.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
-    gpuErrCheck(cudaMemcpyAsync(d_mapLy, mapLy.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
-    gpuErrCheck(cudaMemcpyAsync(d_mapRx, mapRx.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
-    gpuErrCheck(cudaMemcpyAsync(d_mapRy, mapRy.data(), sizeof(float)*size, cudaMemcpyHostToDevice));
-
-    if (!rectified) {
-        gpuErrCheck(cudaMalloc((void **)&d_rawim0, sizeof(uint8_t)*size));
-        gpuErrCheck(cudaMalloc((void **)&d_rawim1, sizeof(uint8_t)*size));
-    }
-    gpuErrCheck(cudaMalloc((void **)&d_im0, sizeof(uint8_t)*size));
-    gpuErrCheck(cudaMalloc((void **)&d_im1, sizeof(uint8_t)*size));
-
-    gpuErrCheck(cudaMalloc((void **)&d_census0, sizeof(uint32_t)*size));
-    gpuErrCheck(cudaMalloc((void **)&d_census1, sizeof(uint32_t)*size));
-
-    if (bfWidth * bfHeight != 1) {
-        gpuErrCheck(cudaMalloc((void **)&d_rawcost, sizeof(cost_t)*size3d));
-        gpuErrCheck(cudaMalloc((void **)&d_hsum, sizeof(cost_t)*size3d));
-    }
-    gpuErrCheck(cudaMalloc((void **)&d_cost, sizeof(cost_t)*size3d));
-
-    gpuErrCheck(cudaMalloc((void **)&d_L0, sizeof(cost_t)*size3d));
-    gpuErrCheck(cudaMalloc((void **)&d_L1, sizeof(cost_t)*size3d));
-    gpuErrCheck(cudaMalloc((void **)&d_L2, sizeof(cost_t)*size3d));
-    gpuErrCheck(cudaMalloc((void **)&d_LAll, sizeof(cost_t)*size3d));
-
-    gpuErrCheck(cudaMalloc((void **)&d_leftDisp, sizeof(float)*size));
-    gpuErrCheck(cudaMalloc((void **)&d_rightDisp, sizeof(uint16_t)*size));
-
-    if (mfSize != 1) {
-        gpuErrCheck(cudaMalloc((void **)&d_filteredDisp, sizeof(float)*size));
-    }
-
-#ifndef DISP_ONLY
-    gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
-#endif
-
-    gpuErrCheck(cudaDeviceSynchronize());
-    memoryOccupied = true;
-    initiated = true;
-}
-
-Mat2d<float> coreCompute(Mat2d<uint8_t> left, Mat2d<uint8_t> right) {
-    if (initiated == false) { throw std::runtime_error("Module must be initialized before computing"); }
     if (left.rows() != right.rows() || left.cols() != right.cols()) { throw std::runtime_error("Both images must have the same size"); }
     if (cols != left.cols() || rows != left.rows()) { throw std::runtime_error("Input image size different from initiated"); }
 
@@ -339,7 +348,10 @@ Mat2d<float> coreCompute(Mat2d<uint8_t> left, Mat2d<uint8_t> right) {
     gpuErrCheck(cudaDeviceSynchronize());
     gpuErrCheck(cudaMemcpy(h_disp, d_finalDisp, sizeof(float)*size, cudaMemcpyDeviceToHost));
     Mat2d<float> disp(rows, cols, h_disp);
-    return disp;
+    
+    // Convert from C++ to python
+    py::array_t<float> disp_ndarray = Mat2d2ndarray<float>(disp);
+    return disp_ndarray;
 #else
     // Convert disparity into depth
     gpuErrCheck(cudaDeviceSynchronize());
@@ -370,7 +382,10 @@ Mat2d<float> coreCompute(Mat2d<uint8_t> left, Mat2d<uint8_t> right) {
         gpuErrCheck(cudaDeviceSynchronize());
         gpuErrCheck(cudaMemcpy(h_depth, d_rgbDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToHost));
         Mat2d<float> depth(rgbRows, rgbCols, h_depth);
-        return depth;
+        
+        // Convert from C++ to python
+        py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
+        return depth_ndarray;
     } else {
         correctDepthRange<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_depth, size, minDepth, maxDepth);
         
@@ -379,22 +394,19 @@ Mat2d<float> coreCompute(Mat2d<uint8_t> left, Mat2d<uint8_t> right) {
         gpuErrCheck(cudaDeviceSynchronize());
         gpuErrCheck(cudaMemcpy(h_depth, d_depth, sizeof(float)*size, cudaMemcpyDeviceToHost));
         Mat2d<float> depth(rows, cols, h_depth);
-        return depth;
+
+        // Convert from C++ to python
+        py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
+        return depth_ndarray;
     }
 #endif
 }
 
-void coreClose() {
-    if (initiated) {
-        freeMemory();
-        gpuErrCheck(cudaStreamDestroy(stream1));
-        gpuErrCheck(cudaStreamDestroy(stream2));
-        gpuErrCheck(cudaStreamDestroy(stream3));
-        initiated = false;
-    }
-}
+DepthSensorEngine::~DepthSensorEngine() {
+    gpuErrCheck(cudaStreamDestroy(stream1));
+    gpuErrCheck(cudaStreamDestroy(stream2));
+    gpuErrCheck(cudaStreamDestroy(stream3));
 
-static void freeMemory() {
     gpuErrCheck(cudaFree(d_mapLx));
     gpuErrCheck(cudaFree(d_mapLy));
     gpuErrCheck(cudaFree(d_mapRx));
@@ -433,7 +445,6 @@ static void freeMemory() {
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
-    memoryOccupied = false;
 }
 
 }

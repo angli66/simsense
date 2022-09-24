@@ -56,7 +56,7 @@ setup(
     long_description=open("README.md").read(),
     long_description_content_type="text/markdown",
     packages=["simsense"],
-    package_dir={"simsense": "python"},
+    package_dir={"simsense": "python/package"},
     python_requires=">=3.6",
     install_requires=read_requirements(),
     ext_modules=[CMakeExtension("pysimsense")],

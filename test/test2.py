@@ -35,7 +35,6 @@ depthSensor = DepthSensor(lr_size, k_l, k_r, l2r, rgb_size, k_rgb, l2rgb, min_de
                             census_width=7, census_height=7, block_width=7, block_height=7,
                             uniqueness_ratio=15, depth_dilation=True)
 result = depthSensor.compute(left, right)
-depthSensor.close()
 
 cmap = plt.cm.get_cmap('jet').copy()
 cmap.set_bad(color='black')

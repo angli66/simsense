@@ -27,5 +27,3 @@ start = time.process_time()
 for i in range(1000):
     result = depthSensor.compute(left, right)
 print("Runtime for 1000 calls of compute():", time.process_time() - start, "second")
-
-depthSensor.close()

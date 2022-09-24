@@ -18,21 +18,18 @@ set(
 
 include_directories(
   ${PYTHON_INCLUDE_DIRS}
-  3rd_party/pybind11/include
+  "3rd_party/pybind11/include"
   "include"
 )
 
 link_directories(
-  /usr/local/cuda/lib64
+  "/usr/local/cuda/lib64"
 )
 
 file(GLOB_RECURSE SIMSENSE_SRC "src/*")
 
-cuda_add_library(pysimsense SHARED ${SIMSENSE_SRC})
+cuda_add_library(pysimsense SHARED ${SIMSENSE_SRC} python/pysimsense.cu)
 
-target_link_libraries(pysimsense
-  ${PYTHON_LIBRARIES}
-  cudart
-)
+target_link_libraries(pysimsense ${PYTHON_LIBRARIES} cudart)
 
 set_target_properties(pysimsense PROPERTIES PREFIX "")
