@@ -1,6 +1,8 @@
 #include <pybind11/pybind11.h>
 #include "core.h"
 
+namespace py = pybind11;
+
 using namespace simsense;
 
 PYBIND11_MODULE(pysimsense, m) {
