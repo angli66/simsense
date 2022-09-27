@@ -1,8 +1,8 @@
-#ifndef LRCHECK_H
-#define LRCHECK_H
+#ifndef SIMSENSE_LRCHECK_H
+#define SIMSENSE_LRCHECK_H
 
-#include "config.h"
 #include <cmath>
+#include <simsense/config.h>
 
 namespace simsense {
 

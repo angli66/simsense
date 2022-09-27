@@ -1,4 +1,19 @@
-#include "core.h"
+#include <simsense/core.h>
+#include <simsense/camera.h>
+#include <simsense/csct.h>
+#include <simsense/cost.h>
+#include <simsense/aggr.h>
+#include <simsense/wta.h>
+#include <simsense/lrcheck.h>
+#include <simsense/filter.h>
+
+#define gpuErrCheck(ans) { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
+   if (code != cudaSuccess) {
+      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+      if (abort) { exit(code); }
+   }
+}
 
 using namespace simsense;
 

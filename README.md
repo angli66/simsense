@@ -24,7 +24,7 @@ Optional depth registration can be performed with little cost at this step, whic
 
 ## Requirements
 - CUDA ToolKit
-- CMAKE 3.6 or later
+- CMAKE 3.18 or later
 - opencv-python
 
 CUDA Toolkit needs to be installed to compile .cu source files. Check https://developer.nvidia.com/cuda-downloads for instructions.

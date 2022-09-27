@@ -1,8 +1,8 @@
-#ifndef FILTER_H
-#define FILTER_H
+#ifndef SIMSENSE_FILTER_H
+#define SIMSENSE_FILTER_H
 
 #include <stdint.h>
-#include "config.h"
+#include <simsense/config.h>
 
 namespace simsense {
 

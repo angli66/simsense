@@ -1,5 +1,7 @@
+#include <stdint.h>
 #include <pybind11/pybind11.h>
-#include "core.h"
+#include <pybind11/numpy.h>
+#include <simsense/core.h>
 
 namespace py = pybind11;
 

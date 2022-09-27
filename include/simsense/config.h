@@ -1,5 +1,5 @@
-#ifndef CONFIG_H
-#define CONFIG_H
+#ifndef SIMSENSE_CONFIG_H
+#define SIMSENSE_CONFIG_H
 
 #include <stdint.h>
 

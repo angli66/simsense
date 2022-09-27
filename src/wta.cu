@@ -1,4 +1,4 @@
-#include "wta.h"
+#include <simsense/wta.h>
 
 namespace simsense {
 

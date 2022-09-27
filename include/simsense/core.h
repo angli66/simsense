@@ -1,28 +1,14 @@
-#ifndef CORE_H
-#define CORE_H
+#ifndef SIMSENSE_CORE_H
+#define SIMSENSE_CORE_H
 
 #include <stdint.h>
 #include <iostream>
+#include <driver_types.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
-#include "config.h"
-#include "camera.h"
-#include "csct.h"
-#include "cost.h"
-#include "aggr.h"
-#include "wta.h"
-#include "lrcheck.h"
-#include "filter.h"
+#include <simsense/config.h>
 
 namespace py = pybind11;
-
-#define gpuErrCheck(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
-   if (code != cudaSuccess) {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) { exit(code); }
-   }
-}
 
 namespace simsense {
 

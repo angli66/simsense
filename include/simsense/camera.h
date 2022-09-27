@@ -1,9 +1,9 @@
-#ifndef CAMERA_H
-#define CAMERA_H
+#ifndef SIMSENSE_CAMERA_H
+#define SIMSENSE_CAMERA_H
 
 #include <stdint.h>
 #include <cmath>
-#include "config.h"
+#include <simsense/config.h>
 
 #define ERROR_MARGIN 0.01
 #define BORDER_VALUE 0

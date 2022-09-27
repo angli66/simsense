@@ -1,14 +1,14 @@
-#ifndef AGGR_H
-#define AGGR_H
+#ifndef SIMSENSE_AGGR_H
+#define SIMSENSE_AGGR_H
 
 #include <stdint.h>
-#include "config.h"
+#include <simsense/config.h>
 
 namespace simsense {
 
 __global__
 void aggrLeft2Right(cost_t *d_cost, cost_t *d_L, const int p1, const int p2, const int rows, const int cols, const int maxDisp);
-                                        
+
 __global__
 void aggrRight2Left(cost_t *d_cost, cost_t *d_L, const int p1, const int p2, const int rows, const int cols, const int maxDisp);
 

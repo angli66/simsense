@@ -1,4 +1,4 @@
-#include "camera.h"
+#include <simsense/camera.h>
 
 namespace simsense {
 

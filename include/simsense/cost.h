@@ -1,8 +1,8 @@
-#ifndef COST_H
-#define COST_H
+#ifndef SIMSENSE_COST_H
+#define SIMSENSE_COST_H
 
 #include <stdint.h>
-#include "config.h"
+#include <simsense/config.h>
 
 namespace simsense {
 

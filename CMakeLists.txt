@@ -1,35 +1,23 @@
-cmake_minimum_required(VERSION 3.6 FATAL_ERROR)
-project(pysimsense)
+cmake_minimum_required(VERSION 3.18 FATAL_ERROR)
+project(pysimsense LANGUAGES CXX CUDA)
 
-find_package(CUDA REQUIRED)
-find_package(PythonInterp 3.6 REQUIRED)
-find_package(PythonLibs 3.6 REQUIRED)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_FLAGS "-O3 -g0 -Wall -Wnon-virtual-dtor -fsized-deallocation -Wno-deprecated-declarations")
+set(CMAKE_CUDA_STANDARD 20)
+set(CUDA_NVCC_FLAGS "${CUDA_NVCC_FLAGS} -O3 -lineinfo -ftemplate-depth=1024")
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
-set(
-  CUDA_NVCC_FLAGS
-  ${CUDA_NVCC_FLAGS};
-  -O3 -lineinfo
-  -gencode=arch=compute_75,code=sm_75
-  -gencode=arch=compute_80,code=sm_80
-  -gencode=arch=compute_86,code=sm_86
-  -ftemplate-depth=1024
-)
-
+add_subdirectory("3rd_party/pybind11")
 include_directories(
-  ${PYTHON_INCLUDE_DIRS}
+  ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}
   "3rd_party/pybind11/include"
+  ${PYTHON_INCLUDE_DIRS}
   "include"
 )
 
-link_directories(
-  "/usr/local/cuda/lib64"
-)
-
 file(GLOB_RECURSE SIMSENSE_SRC "src/*")
+add_library(simsense SHARED ${SIMSENSE_SRC})
+set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "75;80;86")
 
-cuda_add_library(pysimsense SHARED ${SIMSENSE_SRC} python/pysimsense.cu)
-
-target_link_libraries(pysimsense ${PYTHON_LIBRARIES} cudart)
-
+pybind11_add_module(pysimsense "python/pysimsense.cu")
 set_target_properties(pysimsense PROPERTIES PREFIX "")
+target_link_libraries(pysimsense PRIVATE simsense)

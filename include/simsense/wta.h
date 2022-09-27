@@ -1,7 +1,7 @@
-#ifndef WTA_H
-#define WTA_H
+#ifndef SIMSENSE_WTA_H
+#define SIMSENSE_WTA_H
 
-#include "config.h"
+#include <simsense/config.h>
 
 namespace simsense {
 

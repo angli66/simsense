@@ -1,8 +1,8 @@
-#ifndef CSCT_H
-#define CSCT_H
+#ifndef SIMSENSE_CSCT_H
+#define SIMSENSE_CSCT_H
 
 #include <stdint.h>
-#include "config.h"
+#include <simsense/config.h>
 
 namespace simsense {
 
