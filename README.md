@@ -25,31 +25,23 @@ Optional depth registration can be performed with little cost at this step, whic
 ## Requirements
 - CUDA ToolKit
 - CMAKE 3.18 or later
-- opencv-python
 
 CUDA Toolkit needs to be installed to compile .cu source files. Check https://developer.nvidia.com/cuda-downloads for instructions.
 
 ## Install
-Before installing, check your NVIDIA GPU's compute capability at https://developer.nvidia.com/cuda-gpus. If your GPU's compute capability is of 7.5, 8.0 or 8.6, simply run
-
-    pip install git+https://github.com/angli66/simsense.git
-
-to build the package with `pip`. Otherwise, check the following **Build Locally** section.
-
-## Build Locally
-The default settings only supports NVIDIA GPU with compute capability of 7.5, 8.0 and 8.6. One might want to build locally to accustom GPUs with different compute capabilities. This is still fairly simple with a few more commands.
-
 Run
 
-    git clone git@github.com:angli66/SimSense.git
-    cd SimSense
+    git clone git@github.com:angli66/simsense.git
+    cd simsense
     git submodule update --init
 
-to clone the repository and get the 3rd party library. Check your GPU's compute capability and add the value into `CMakeLists.txt` under the root directory. For example, if your GPU's compute capability is of 7.0, add 
+to clone the repository and get the 3rd party library.
 
-    -gencode=arch=compute_70,code=sm_70
+Before installing, check your NVIDIA GPU's compute capability at https://developer.nvidia.com/cuda-gpus. The default settings only supports NVIDIA GPU with compute capability of 7.5, 8.0 and 8.6. Check your GPU's compute capability and if it's not listed above, add the value into `CMakeLists.txt`. For example, if your GPU's compute capability is 7.0, change line 19 of `CmakeLists.txt` into
 
-into `CmakeLists.txt`. After that, run
+    set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "70;75;80;86")
+
+After that, run
 
     pip install .
 
