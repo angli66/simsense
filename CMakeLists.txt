@@ -18,6 +18,6 @@ file(GLOB_RECURSE SIMSENSE_SRC "src/*")
 add_library(simsense SHARED ${SIMSENSE_SRC})
 set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "75;80;86")
 
-pybind11_add_module(pysimsense "python/pysimsense.cu")
+pybind11_add_module(pysimsense "python/pysimsense.cpp")
 set_target_properties(pysimsense PROPERTIES PREFIX "")
 target_link_libraries(pysimsense PRIVATE simsense)

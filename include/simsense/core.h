@@ -47,18 +47,20 @@ py::array_t<T> Mat2d2ndarray(Mat2d<T> arr) {
 // Main sensor class
 class DepthSensorEngine {
 public:
+    __attribute__((visibility("default")))
     DepthSensorEngine(uint32_t _rows, uint32_t _cols, float _focalLen, float _baselineLen, float _minDepth, float _maxDepth, bool _rectified,
                         uint8_t _censusWidth, uint8_t _censusHeight, uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight, uint8_t _p1, uint8_t _p2,
                         uint8_t _uniqRatio, uint8_t lrMaxDiff, uint8_t _mfSize, py::array_t<float> map_lx, py::array_t<float> map_ly,
                         py::array_t<float> map_rx, py::array_t<float> map_ry);
 
-
+    __attribute__((visibility("default")))
     DepthSensorEngine(uint32_t _rows, uint32_t _cols, uint32_t _rgbRows, uint32_t _rgbCols, float _focalLen, float _baselineLen, float _minDepth,
                         float _maxDepth, bool _rectified, uint8_t _censusWidth, uint8_t _censusHeight, uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight,
                         uint8_t _p1, uint8_t _p2, uint8_t _uniqRatio, uint8_t _lrMaxDiff, uint8_t _mfSize, py::array_t<float> map_lx, py::array_t<float> map_ly,
                         py::array_t<float> map_rx, py::array_t<float> map_ry, py::array_t<float> _a1, py::array_t<float> _a2, py::array_t<float> _a3,
                         float _b1, float _b2, float _b3, bool _dilation);
 
+    __attribute__((visibility("default")))
     py::array_t<float> compute(py::array_t<uint8_t> left_ndarray, py::array_t<uint8_t> right_ndarray);
 
     ~DepthSensorEngine();
