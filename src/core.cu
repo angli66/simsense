@@ -457,6 +457,12 @@ DepthSensorEngine::~DepthSensorEngine() {
 
 #ifndef DISP_ONLY
     gpuErrCheck(cudaFree(d_depth));
+    if (registration) {
+        gpuErrCheck(cudaFree(d_a1));
+        gpuErrCheck(cudaFree(d_a2));
+        gpuErrCheck(cudaFree(d_a3));
+        gpuErrCheck(cudaFree(d_rgbDepth));
+    }
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
