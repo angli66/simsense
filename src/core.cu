@@ -97,8 +97,11 @@ DepthSensorEngine::DepthSensorEngine(
         gpuErrCheck(cudaMalloc((void **)&d_filteredDisp, sizeof(float)*size));
     }
 
-#ifndef DISP_ONLY
+#ifdef DISP_ONLY
+    h_disp = new float[size];
+#else
     gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
+    h_depth = new float[size];
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
@@ -193,7 +196,9 @@ DepthSensorEngine::DepthSensorEngine(
         gpuErrCheck(cudaMalloc((void **)&d_filteredDisp, sizeof(float)*size));
     }
 
-#ifndef DISP_ONLY
+#ifdef DISP_ONLY
+    h_disp = new float[size];
+#else
     gpuErrCheck(cudaMalloc((void **)&d_a1, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_a2, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_a3, sizeof(float)*size));
@@ -203,6 +208,7 @@ DepthSensorEngine::DepthSensorEngine(
 
     gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_rgbDepth, sizeof(float)*rgbSize));
+    h_depth = new float[rgbSize];
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
@@ -359,7 +365,6 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
 #endif
 
 #ifdef DISP_ONLY
-    float *h_disp = new float[size];
     gpuErrCheck(cudaDeviceSynchronize());
     gpuErrCheck(cudaMemcpy(h_disp, d_finalDisp, sizeof(float)*size, cudaMemcpyDeviceToHost));
     Mat2d<float> disp(rows, cols, h_disp);
@@ -393,7 +398,6 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
 #endif
         
         // GPU to CPU transfer
-        float *h_depth = new float[rgbSize];
         gpuErrCheck(cudaDeviceSynchronize());
         gpuErrCheck(cudaMemcpy(h_depth, d_rgbDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToHost));
         Mat2d<float> depth(rgbRows, rgbCols, h_depth);
@@ -405,7 +409,6 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         correctDepthRange<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_depth, size, minDepth, maxDepth);
         
         // GPU to CPU transfer
-        float *h_depth = new float[size];
         gpuErrCheck(cudaDeviceSynchronize());
         gpuErrCheck(cudaMemcpy(h_depth, d_depth, sizeof(float)*size, cudaMemcpyDeviceToHost));
         Mat2d<float> depth(rows, cols, h_depth);
@@ -455,7 +458,9 @@ DepthSensorEngine::~DepthSensorEngine() {
         gpuErrCheck(cudaFree(d_filteredDisp));
     }
 
-#ifndef DISP_ONLY
+#ifdef DISP_ONLY
+    delete h_disp;
+#else
     gpuErrCheck(cudaFree(d_depth));
     if (registration) {
         gpuErrCheck(cudaFree(d_a1));
@@ -463,6 +468,7 @@ DepthSensorEngine::~DepthSensorEngine() {
         gpuErrCheck(cudaFree(d_a3));
         gpuErrCheck(cudaFree(d_rgbDepth));
     }
+    delete h_depth;
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
