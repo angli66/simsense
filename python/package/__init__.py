@@ -111,6 +111,34 @@ class DepthSensor:
         result = self.engine.compute(img_l, img_r)
 
         return result
+    
+    def set_penalties(self, p1_penalty, p2_penalty):
+        if not isinstance(p1_penalty, int) or not isinstance(p2_penalty, int) or p1_penalty <= 0 or p2_penalty <= 0 or \
+                p1_penalty >= p2_penalty or p2_penalty >= 224:
+            raise TypeError("p1 must be positive integer less than p2 and p2 be positive integer less than 224")
+        self.engine._set_penalties(p1_penalty, p2_penalty)
+    
+    def set_census_window_size(self, census_width, census_height):
+        if not isinstance(census_width, int) or not isinstance(census_height, int) or census_width <= 0 or census_height <= 0 or \
+                census_width % 2 == 0 or census_height % 2 == 0 or census_width*census_height > 65:
+            raise TypeError("census_width and census_height must be positive odd integers and their product should be no larger than 65")
+        self.engine._set_census_window_size(census_width, census_height)
+    
+    def set_matching_block_size(self, block_width, block_height):
+        if not isinstance(block_width, int) or not isinstance(block_height, int) or block_width <= 0 or block_height <= 0 or \
+                block_width % 2 == 0 or block_height % 2 == 0 or block_width*block_height > 256:
+            raise TypeError("block_width and block_height must be positive odd integers and their product should be no larger than 256")
+        self.engine._set_matching_block_size(block_width, block_height)
+    
+    def set_uniqueness_ratio(self, uniqueness_ratio):
+        if not isinstance(uniqueness_ratio, int) or uniqueness_ratio < 0 or uniqueness_ratio > 255:
+            raise TypeError("uniqueness_ratio must be positive integer no larger than 255")
+        self.engine._set_uniqueness_ratio(uniqueness_ratio)
+
+    def set_lr_max_diff(self, lr_max_diff):
+        if not isinstance(lr_max_diff, int) or lr_max_diff < -1 or lr_max_diff > 255:
+            raise TypeError("lr_max_diff must be integer within the range [0, 255]")
+        self.engine._set_lr_max_diff(lr_max_diff)
 
     def _get_registration_mat(self, ir_size, k_ir, k_rgb, ir2rgb):
         R = ir2rgb[:3, :3]

@@ -63,6 +63,12 @@ public:
     __attribute__((visibility("default")))
     py::array_t<float> compute(py::array_t<uint8_t> left_ndarray, py::array_t<uint8_t> right_ndarray);
 
+    void setPenalties(uint8_t _p1, uint8_t _p2);
+    void setCensusWindowSize(uint8_t _censusWidth, uint8_t _censusHeight);
+    void setMatchingBlockSize(uint8_t _bfWidth, uint8_t _bfHeight);
+    void setUniquenessRatio(uint8_t _uniqRatio);
+    void setLrMaxDiff(uint8_t _lrMaxDiff);
+
     ~DepthSensorEngine();
 
 protected:
@@ -73,8 +79,8 @@ protected:
     cost_t *d_rawcost, *d_hsum, *d_cost, *d_L0, *d_L1, *d_L2, *d_LAll;
     float *d_leftDisp, *d_filteredDisp, *d_depth, *d_rgbDepth, *h_disp, *h_depth;
     uint16_t *d_rightDisp;
-    uint8_t censusWidth, censusHeight, bfWidth, bfHeight, uniqRatio, lrMaxDiff, mfSize;
-    uint32_t rows, cols, size, maxDisp, p1, p2, rgbRows, rgbCols, rgbSize;
+    uint8_t censusWidth, censusHeight, bfWidth, bfHeight, p1, p2, uniqRatio, lrMaxDiff, mfSize;
+    uint32_t rows, cols, size, maxDisp, rgbRows, rgbCols, rgbSize;
     float focalLen, baselineLen, minDepth, maxDepth, b1, b2, b3;
     bool rectified, registration, dilation;
 };

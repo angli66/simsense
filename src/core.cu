@@ -42,8 +42,8 @@ DepthSensorEngine::DepthSensorEngine(
     censusHeight = _censusHeight;
     bfWidth = _bfWidth;
     bfHeight = _bfHeight;
-    p1 = _p1 * bfWidth * bfHeight;
-    p2 = _p2 * bfWidth * bfHeight;
+    p1 = _p1;
+    p2 = _p2;
     uniqRatio = _uniqRatio;
     lrMaxDiff = _lrMaxDiff;
     mfSize = _mfSize;
@@ -134,8 +134,8 @@ DepthSensorEngine::DepthSensorEngine(
     censusHeight = _censusHeight;
     bfWidth = _bfWidth;
     bfHeight = _bfHeight;
-    p1 = _p1 * bfWidth * bfHeight;
-    p2 = _p2 * bfWidth * bfHeight;
+    p1 = _p1;
+    p2 = _p2;
     uniqRatio = _uniqRatio;
     lrMaxDiff = _lrMaxDiff;
     mfSize = _mfSize;
@@ -303,11 +303,13 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
 #endif
     // Cost aggregation
     gpuErrCheck(cudaDeviceSynchronize());
-    aggrLeft2Right<<<rows, maxDisp, maxDisp*sizeof(cost_t), stream1>>>(d_cost, d_L0, p1, p2, rows, cols, maxDisp);
-    aggrRight2Left<<<rows, maxDisp, maxDisp*sizeof(cost_t), stream2>>>(d_cost, d_L1, p1, p2, rows, cols, maxDisp);
-    aggrTop2Bottom<<<cols, maxDisp, maxDisp*sizeof(cost_t), stream3>>>(d_cost, d_L2, p1, p2, rows, cols, maxDisp);
+    int P1 = p1 * bfWidth * bfHeight;
+    int P2 = p2 * bfWidth * bfHeight;
+    aggrLeft2Right<<<rows, maxDisp, maxDisp*sizeof(cost_t), stream1>>>(d_cost, d_L0, P1, P2, rows, cols, maxDisp);
+    aggrRight2Left<<<rows, maxDisp, maxDisp*sizeof(cost_t), stream2>>>(d_cost, d_L1, P1, P2, rows, cols, maxDisp);
+    aggrTop2Bottom<<<cols, maxDisp, maxDisp*sizeof(cost_t), stream3>>>(d_cost, d_L2, P1, P2, rows, cols, maxDisp);
     gpuErrCheck(cudaDeviceSynchronize());
-    aggrBottom2Top<<<cols, maxDisp, maxDisp*sizeof(cost_t), stream1>>>(d_cost, d_LAll, d_L0, d_L1, d_L2, p1, p2, rows, cols, maxDisp);
+    aggrBottom2Top<<<cols, maxDisp, maxDisp*sizeof(cost_t), stream1>>>(d_cost, d_LAll, d_L0, d_L1, d_L2, P1, P2, rows, cols, maxDisp);
 #ifdef PRINT_RUNTIME
     cudaEventRecord(stop);
     gpuErrCheck(cudaDeviceSynchronize());
@@ -418,6 +420,29 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         return depth_ndarray;
     }
 #endif
+}
+
+void DepthSensorEngine::setPenalties(uint8_t _p1, uint8_t _p2) {
+    p1 = _p1;
+    p2 = _p2;
+}
+
+void DepthSensorEngine::setCensusWindowSize(uint8_t _censusWidth, uint8_t _censusHeight) {
+    censusWidth = _censusWidth;
+    censusHeight = _censusHeight;
+}
+
+void DepthSensorEngine::setMatchingBlockSize(uint8_t _bfWidth, uint8_t _bfHeight) {
+    bfWidth = _bfWidth;
+    bfHeight = _bfHeight;
+}
+
+void DepthSensorEngine::setUniquenessRatio(uint8_t _uniqRatio) {
+    uniqRatio = _uniqRatio;
+}
+
+void DepthSensorEngine::setLrMaxDiff(uint8_t _lrMaxDiff) {
+    lrMaxDiff = _lrMaxDiff;
 }
 
 DepthSensorEngine::~DepthSensorEngine() {
