@@ -39,9 +39,9 @@ Run
 
 to clone the repository and get the 3rd party library.
 
-Before installing, check your NVIDIA GPU's compute capability at https://developer.nvidia.com/cuda-gpus. The default settings only supports NVIDIA GPU with compute capability of 7.5, 8.0 and 8.6. Check your GPU's compute capability and if it's not listed above, add the value into `CMakeLists.txt`. For example, if your GPU's compute capability is 7.0, change line 19 of `CmakeLists.txt` into
+Before installing, check your NVIDIA GPU's compute capability at https://developer.nvidia.com/cuda-gpus. The default settings supports NVIDIA GPU with compute capability of 6.0, 6.1, 7.0, 7.5, 8.0 and 8.6. Check your GPU's compute capability and if it's not listed above, add the value into `CMakeLists.txt`. For example, if your GPU's compute capability is 8.9, change line 19 of `CmakeLists.txt` into
 
-    set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "70;75;80;86")
+    set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "60;61;70;75;80;86;89")
 
 After that, run
 

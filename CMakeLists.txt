@@ -16,7 +16,7 @@ include_directories(
 
 file(GLOB_RECURSE SIMSENSE_SRC "src/*")
 add_library(simsense SHARED ${SIMSENSE_SRC})
-set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "75;80;86") # Support GPU's compute capabilities
+set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "60;61;70;75;80;86") # Support GPU's compute capabilities
 
 pybind11_add_module(pysimsense "python/pysimsense.cpp")
 set_target_properties(pysimsense PROPERTIES PREFIX "")
