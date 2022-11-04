@@ -39,9 +39,7 @@ Run
 
 to clone the repository and get the 3rd party library.
 
-Before installing, check your NVIDIA GPU's compute capability at https://developer.nvidia.com/cuda-gpus. The default settings supports NVIDIA GPU with compute capability of 6.0, 6.1, 7.0, 7.5, 8.0 and 8.6. Check your GPU's compute capability and if it's not listed above, add the value into `CMakeLists.txt`. For example, if your GPU's compute capability is 8.9, change line 19 of `CmakeLists.txt` into
-
-    set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "60;61;70;75;80;86;89")
+Before installing, check your NVIDIA GPU's compute capability at https://developer.nvidia.com/cuda-gpus. The default settings supports NVIDIA GPU with compute capability of 6.0, 6.1, 7.0, 7.5, 8.0 and 8.6. Check your GPU's compute capability and if it's not listed above, add the value into line 19 of `CMakeLists.txt`.
 
 After that, run
 
@@ -81,7 +79,8 @@ Experiment settings:
 (w/o Block Cost means `block_width=1` and `block_height=1`)
 
 ## Known Issues
-Doing numpy array slicing on column (e.g. `img = img[:, :-1]`) before feeding the image into the module will lead to incorrect output. This has something to do with the memory layout of the numpy array. To avoid this, use `numpy.delete()` instead of array slicing when necessary.
+- Doing numpy array slicing on column (e.g. `img = img[:, :-1]`) before feeding the image into the module will lead to incorrect output. This has something to do with the memory layout of the numpy array. To avoid this, use `numpy.delete()` instead of array slicing when necessary.
+- Random `illegal GPU memory access` error might occur when `max_disp` are set to <= 64 and CUDA version is 11.8. This behavior happens especially on RTX 4090. The reason is unclear yet but might be related with CUDA.
 
 ## Acknowledgement
 Some acceleration techniques of the module are inspired by this great paper: [Embedded real-time stereo estimation via Semi-Global Matching on the GPU](http://www.sciencedirect.com/science/article/pii/S1877050916306561) by [D. Hernandez-Juarez](http://danihernandez.eu) et al..
