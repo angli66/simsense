@@ -1,3 +1,4 @@
+3rd_party/pybind11
 .DS_Store
 build/
 dist/
