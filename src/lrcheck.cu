@@ -10,7 +10,7 @@ void lrConsistencyCheck(float *d_leftDisp, const uint16_t *d_rightDisp, const in
     if (y >= rows) { return; }
 
     int ld = (int)round(d_leftDisp[pos]);
-    if (x-ld < 0 || abs(ld - d_rightDisp[y*cols + x-ld]) > lrMaxDiff) {
+    if (ld < 0 || x-ld < 0 || abs(ld - d_rightDisp[y*cols + x-ld]) > lrMaxDiff) {
         d_leftDisp[pos] = -1;
     }
 }

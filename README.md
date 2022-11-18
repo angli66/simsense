@@ -80,7 +80,6 @@ Experiment settings:
 
 ## Known Issues
 - Doing numpy array slicing on column (e.g. `img = img[:, :-1]`) before feeding the image into the module will lead to incorrect output. This has something to do with the memory layout of the numpy array. To avoid this, use `numpy.delete()` instead of array slicing when necessary.
-- Random `illegal GPU memory access` error might occur when `max_disp` are set to <= 64 and CUDA version is 11.8. This behavior happens especially on RTX 4090. The reason is unclear yet but might be related with CUDA.
 
 ## Acknowledgement
 Some acceleration techniques of the module are inspired by this great paper: [Embedded real-time stereo estimation via Semi-Global Matching on the GPU](http://www.sciencedirect.com/science/article/pii/S1877050916306561) by [D. Hernandez-Juarez](http://danihernandez.eu) et al..
