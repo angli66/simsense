@@ -19,9 +19,7 @@ l2r = np.array([
 left = (plt.imread("img/left1.png") * 255).astype(np.uint8)
 right = (plt.imread("img/right1.png") * 255).astype(np.uint8)
 
-depthSensor = DepthSensor(lr_size, k_l, k_r, l2r, min_depth=0.0, max_depth=1.3,
-                            census_width=7, census_height=7, block_width=7,
-                            block_height=7, uniqueness_ratio=15)
+depthSensor = DepthSensor(lr_size, k_l, k_r, l2r, max_depth=1.3)
 result = depthSensor.compute(left, right)
 
 cmap = plt.cm.get_cmap('jet').copy()

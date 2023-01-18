@@ -12,23 +12,24 @@ PYBIND11_MODULE(pysimsense, m) {
 
     PySimsense.def(
         py::init<
-            uint32_t, uint32_t, float, float, float, float, bool,
-            uint8_t, uint8_t, uint32_t, uint8_t, uint8_t, uint8_t, uint8_t,
-            uint8_t, uint8_t, uint8_t, py::array_t<float>, py::array_t<float>,
-            py::array_t<float>, py::array_t<float>
+            uint32_t, uint32_t, float, float, float, float, uint64_t,
+            float, float, float, float, bool, uint8_t, uint8_t, uint32_t,
+            uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t,
+            py::array_t<float>, py::array_t<float>, py::array_t<float>, py::array_t<float>
         >()
     );
     PySimsense.def(
         py::init<
             uint32_t, uint32_t, uint32_t, uint32_t, float, float, float,
-            float, bool, uint8_t, uint8_t, uint32_t, uint8_t, uint8_t,
-            uint8_t, uint8_t, uint8_t, uint8_t, uint8_t, py::array_t<float>,
+            float, uint64_t, float, float, float, float,  bool, uint8_t,
+            uint8_t, uint32_t, uint8_t, uint8_t, uint8_t, uint8_t, uint8_t,
+            uint8_t, uint8_t, py::array_t<float>, py::array_t<float>,
             py::array_t<float>, py::array_t<float>, py::array_t<float>,
-            py::array_t<float>, py::array_t<float>, py::array_t<float>,
-            float, float, float, bool
+            py::array_t<float>, py::array_t<float>, float, float, float, bool
         >()
     );
     PySimsense.def("compute", &DepthSensorEngine::compute);
+    PySimsense.def("_set_ir_noise_parameters", &DepthSensorEngine::setInfraredNoiseParameters);
     PySimsense.def("_set_penalties", &DepthSensorEngine::setPenalties);
     PySimsense.def("_set_census_window_size", &DepthSensorEngine::setCensusWindowSize);
     PySimsense.def("_set_matching_block_size", &DepthSensorEngine::setMatchingBlockSize);

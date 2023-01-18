@@ -3,12 +3,21 @@
 
 #include <stdint.h>
 #include <cmath>
+#include <curand.h>
+#include <curand_kernel.h>
 #include <simsense/config.h>
 
 #define ERROR_MARGIN 0.01
 #define BORDER_VALUE 0
 
 namespace simsense {
+
+__global__
+void initInfraredNoise(curandState_t *states, int seed);
+
+__global__
+void simInfraredNoise(uint8_t *src, uint8_t *dst, curandState_t *states, const int rows, const int cols,
+                        float speckleShape, float speckleScale, float gaussianMu, float gaussianSigma);
 
 __global__
 void remap(const float *mapx, const float *mapy, const uint8_t *src, uint8_t *dst, const int rows, const int cols);

@@ -2,11 +2,52 @@
 
 namespace simsense {
 
-__device__ __forceinline__ float atomicMinFloat(float *addr, float value) {
+__device__ __forceinline__
+float curand_gamma(float shape, float scale, curandState_t* state) {
+    float alpha = shape;
+    float beta = 1 / scale;
+
+    if (alpha >= 1) {
+        float d = alpha - 1 / 3.0, c = 1 / sqrt(9 * d);
+        do {
+            float z = curand_normal(state);
+            float u = curand_uniform(state);
+            float v = pow(1.0f + c * z, 3.0f);
+            if (z > -1 / c && log(u) < (z * z / 2 + d - d * v + d * log(v))) {
+                return d * v / beta;
+            }
+        } while (true);
+    } else {
+        float r = curand_gamma(shape + 1, scale, state);
+        float u = curand_uniform(state);
+        return r * pow(u, 1 / alpha);
+    }
+}
+
+__device__ __forceinline__
+float atomicMinFloat(float *addr, float value) {
     float old;
     old = (value >= 0) ? __int_as_float(atomicMin((int *)addr, __float_as_int(value))) :
         __uint_as_float(atomicMax((unsigned int *)addr, __float_as_uint(value)));
     return old;
+}
+
+__global__
+void initInfraredNoise(curandState_t *states, int seed) {
+    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    curand_init(seed, id, 0, &states[id]);
+}
+
+__global__
+void simInfraredNoise(uint8_t *src, uint8_t *dst, curandState_t *states, const int rows, const int cols,
+                        float speckleShape, float speckleScale, float gaussianMu, float gaussianSigma) {
+    int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= rows * cols) { return; }
+
+    int result = (int)round(src[pos] * curand_gamma(speckleShape, speckleScale, &states[pos]) + gaussianMu + gaussianSigma * curand_normal(&states[pos]));
+    if (result < 0) { result = 0; }
+    if (result > 255) {result = 255; }
+    dst[pos] = result;
 }
 
 __global__

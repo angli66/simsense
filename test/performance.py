@@ -21,9 +21,16 @@ l2r = np.array([
 left = (plt.imread("img/left1.png") * 255).astype(np.uint8)
 right = (plt.imread("img/right1.png") * 255).astype(np.uint8)
 
-depthSensor = DepthSensor(lr_size, k_l, k_r, l2r, max_disp=128, block_width=1, block_height=1)
+# Params
+max_disp = 128
+block_size = (1, 1)
+
+depthSensor = DepthSensor(lr_size, k_l, k_r, l2r, max_disp=max_disp, block_width=block_size[0], block_height=block_size[1])
 
 start = time.process_time()
 for i in range(1000):
     result = depthSensor.compute(left, right)
-print("Runtime for 1000 calls of compute():", time.process_time() - start, "second")
+print(f"Image resolution: {lr_size}")
+print(f"Max disparity: {max_disp}")
+print(f"Block size: {block_size}")
+print("Average FPS for 1000 calls of compute():", 1000 / (time.process_time() - start), "FPS")
