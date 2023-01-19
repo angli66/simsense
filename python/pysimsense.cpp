@@ -5,10 +5,8 @@
 
 namespace py = pybind11;
 
-using namespace simsense;
-
 PYBIND11_MODULE(pysimsense, m) {
-    auto PySimsense = py::class_<DepthSensorEngine>(m, "DepthSensorEngine");
+    auto PySimsense = py::class_<simsense::DepthSensorEngine>(m, "DepthSensorEngine");
 
     PySimsense.def(
         py::init<
@@ -28,11 +26,11 @@ PYBIND11_MODULE(pysimsense, m) {
             py::array_t<float>, py::array_t<float>, float, float, float, bool
         >()
     );
-    PySimsense.def("compute", &DepthSensorEngine::compute);
-    PySimsense.def("_set_ir_noise_parameters", &DepthSensorEngine::setInfraredNoiseParameters);
-    PySimsense.def("_set_census_window_size", &DepthSensorEngine::setCensusWindowSize);
-    PySimsense.def("_set_matching_block_size", &DepthSensorEngine::setMatchingBlockSize);
-    PySimsense.def("_set_penalties", &DepthSensorEngine::setPenalties);
-    PySimsense.def("_set_uniqueness_ratio", &DepthSensorEngine::setUniquenessRatio);
-    PySimsense.def("_set_lr_max_diff", &DepthSensorEngine::setLrMaxDiff);
+    PySimsense.def("compute", &simsense::DepthSensorEngine::compute);
+    PySimsense.def("_set_ir_noise_parameters", &simsense::DepthSensorEngine::setInfraredNoiseParameters);
+    PySimsense.def("_set_census_window_size", &simsense::DepthSensorEngine::setCensusWindowSize);
+    PySimsense.def("_set_matching_block_size", &simsense::DepthSensorEngine::setMatchingBlockSize);
+    PySimsense.def("_set_penalties", &simsense::DepthSensorEngine::setPenalties);
+    PySimsense.def("_set_uniqueness_ratio", &simsense::DepthSensorEngine::setUniquenessRatio);
+    PySimsense.def("_set_lr_max_diff", &simsense::DepthSensorEngine::setLrMaxDiff);
 }
