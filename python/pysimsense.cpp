@@ -30,9 +30,9 @@ PYBIND11_MODULE(pysimsense, m) {
     );
     PySimsense.def("compute", &DepthSensorEngine::compute);
     PySimsense.def("_set_ir_noise_parameters", &DepthSensorEngine::setInfraredNoiseParameters);
-    PySimsense.def("_set_penalties", &DepthSensorEngine::setPenalties);
     PySimsense.def("_set_census_window_size", &DepthSensorEngine::setCensusWindowSize);
     PySimsense.def("_set_matching_block_size", &DepthSensorEngine::setMatchingBlockSize);
+    PySimsense.def("_set_penalties", &DepthSensorEngine::setPenalties);
     PySimsense.def("_set_uniqueness_ratio", &DepthSensorEngine::setUniquenessRatio);
     PySimsense.def("_set_lr_max_diff", &DepthSensorEngine::setLrMaxDiff);
 }
