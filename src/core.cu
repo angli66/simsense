@@ -236,12 +236,17 @@ DepthSensorEngine::DepthSensorEngine(
 }
 
 py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray, py::array_t<uint8_t> right_ndarray) {
-    // Convert from python to C++
+    // Convert from ndarray to Mat2d
     Mat2d<uint8_t> left = ndarray2Mat2d<uint8_t>(left_ndarray);
     Mat2d<uint8_t> right = ndarray2Mat2d<uint8_t>(right_ndarray);
 
+    // Instance check
     if (left.rows() != right.rows() || left.cols() != right.cols()) { throw std::runtime_error("Both images must have the same size"); }
     if (cols != left.cols() || rows != left.rows()) { throw std::runtime_error("Input image size different from initiated"); }
+
+    // Upload to GPU
+    gpuErrCheck(cudaMemcpyAsync(d_rawim0, left.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
+    gpuErrCheck(cudaMemcpyAsync(d_rawim1, right.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
 
 #ifdef PRINT_RUNTIME
     float runtime;
@@ -254,9 +259,6 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
     uint8_t *d_dstim0 = rectified ? d_recim0 : d_im0;
     uint8_t *d_dstim1 = rectified ? d_recim1 : d_im1;
     if (speckleShape > 0) {
-        gpuErrCheck(cudaMemcpyAsync(d_rawim0, left.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
-        gpuErrCheck(cudaMemcpyAsync(d_rawim1, right.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
-
         gpuErrCheck(cudaDeviceSynchronize());
 #ifdef PRINT_RUNTIME
         cudaEventRecord(start);
@@ -270,8 +272,8 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         printf("Runtime of IR noise simulation: %f ms\n", runtime);
 #endif
     } else {
-        gpuErrCheck(cudaMemcpyAsync(d_dstim0, left.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
-        gpuErrCheck(cudaMemcpyAsync(d_dstim1, right.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
+        gpuErrCheck(cudaMemcpyAsync(d_dstim0, d_rawim0, sizeof(uint8_t)*size, cudaMemcpyDeviceToDevice));
+        gpuErrCheck(cudaMemcpyAsync(d_dstim1, d_rawim1, sizeof(uint8_t)*size, cudaMemcpyDeviceToDevice));
     }
 
     // Rectification
@@ -443,7 +445,7 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         gpuErrCheck(cudaMemcpy(h_depth, d_rgbDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToHost));
         Mat2d<float> depth(rgbRows, rgbCols, h_depth);
         
-        // Convert from C++ to python
+        // Convert from Mat2d to ndarray
         py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
         return depth_ndarray;
     } else {
@@ -454,7 +456,7 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         gpuErrCheck(cudaMemcpy(h_depth, d_depth, sizeof(float)*size, cudaMemcpyDeviceToHost));
         Mat2d<float> depth(rows, cols, h_depth);
 
-        // Convert from C++ to python
+        // Convert from Mat2d to ndarray
         py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
         return depth_ndarray;
     }
