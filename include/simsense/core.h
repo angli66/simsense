@@ -4,19 +4,11 @@
 #include <stdint.h>
 #include <iostream>
 #include <driver_types.h>
+#include <curand.h>
+#include <curand_kernel.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <simsense/config.h>
-
-#ifndef HAS_CURAND
-typedef struct curandStateXORWOW {
-    unsigned int d, v[5];
-    int boxmuller_flag;
-    int boxmuller_flag_double;
-    float boxmuller_extra;
-    double boxmuller_extra_double;
-} curandState_t;
-#endif
 
 namespace py = pybind11;
 

@@ -1,6 +1,3 @@
-#include <curand.h>
-#include <curand_kernel.h>
-#define HAS_CURAND
 #include <simsense/core.h>
 #include <simsense/camera.h>
 #include <simsense/csct.h>
