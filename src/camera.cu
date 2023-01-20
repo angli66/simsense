@@ -34,14 +34,14 @@ float atomicMinFloat(float *addr, float value) {
 
 __global__
 void initInfraredNoise(curandState_t *states, int seed) {
-    int id = blockIdx.x * blockDim.x + threadIdx.x;
+    const int id = blockIdx.x * blockDim.x + threadIdx.x;
     curand_init(seed, id, 0, &states[id]);
 }
 
 __global__
 void simInfraredNoise(uint8_t *src, uint8_t *dst, curandState_t *states, const int rows, const int cols,
                         float speckleShape, float speckleScale, float gaussianMu, float gaussianSigma) {
-    int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
     if (pos >= rows * cols) { return; }
 
     int result = (int)round(src[pos] * curand_gamma(speckleShape, speckleScale, &states[pos]) + gaussianMu + gaussianSigma * curand_normal(&states[pos]));
