@@ -4,11 +4,19 @@
 #include <stdint.h>
 #include <iostream>
 #include <driver_types.h>
-#include <curand.h>
-#include <curand_kernel.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <simsense/config.h>
+
+#ifndef HAS_CURAND
+typedef struct curandStateXORWOW {
+    unsigned int d, v[5];
+    int boxmuller_flag;
+    int boxmuller_flag_double;
+    float boxmuller_extra;
+    double boxmuller_extra_double;
+} curandState_t;
+#endif
 
 namespace py = pybind11;
 
@@ -69,6 +77,7 @@ public:
 
     __attribute__((visibility("default")))
     py::array_t<float> compute(py::array_t<uint8_t> left_ndarray, py::array_t<uint8_t> right_ndarray);
+
     void setInfraredNoiseParameters(float _speckleShape, float _speckleScale, float _gaussianMu, float _gaussianSigma);
     void setPenalties(uint8_t _p1, uint8_t _p2);
     void setCensusWindowSize(uint8_t _censusWidth, uint8_t _censusHeight);
