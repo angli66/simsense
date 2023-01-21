@@ -53,13 +53,13 @@ DepthSensorEngine::DepthSensorEngine(
     cols = _cols;
     size = rows*cols;
     maxDisp = _maxDisp;
+    int size3d = size*maxDisp;
     focalLen = _focalLen;
     baselineLen = _baselineLen;
     minDepth = _minDepth;
     maxDepth = _maxDepth;
     rectified = _rectified;
     registration = false;
-    int size3d = size*maxDisp;
 
     // Allocate GPU memory
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates0, sizeof(curandState_t)*size));
