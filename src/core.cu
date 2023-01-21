@@ -79,8 +79,8 @@ DepthSensorEngine::DepthSensorEngine(
     gpuErrCheck(cudaMalloc((void **)&d_rawim0, sizeof(uint8_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_rawim1, sizeof(uint8_t)*size));
     if (!rectified) {
-        gpuErrCheck(cudaMalloc((void **)&d_im0, sizeof(uint8_t)*size));
-        gpuErrCheck(cudaMalloc((void **)&d_im1, sizeof(uint8_t)*size));
+        gpuErrCheck(cudaMalloc((void **)&d_noisyim0, sizeof(uint8_t)*size));
+        gpuErrCheck(cudaMalloc((void **)&d_noisyim1, sizeof(uint8_t)*size));
     }
     gpuErrCheck(cudaMalloc((void **)&d_recim0, sizeof(uint8_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_recim1, sizeof(uint8_t)*size));
@@ -190,8 +190,8 @@ DepthSensorEngine::DepthSensorEngine(
     gpuErrCheck(cudaMalloc((void **)&d_rawim0, sizeof(uint8_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_rawim1, sizeof(uint8_t)*size));
     if (!rectified) {
-        gpuErrCheck(cudaMalloc((void **)&d_im0, sizeof(uint8_t)*size));
-        gpuErrCheck(cudaMalloc((void **)&d_im1, sizeof(uint8_t)*size));
+        gpuErrCheck(cudaMalloc((void **)&d_noisyim0, sizeof(uint8_t)*size));
+        gpuErrCheck(cudaMalloc((void **)&d_noisyim1, sizeof(uint8_t)*size));
     }
     gpuErrCheck(cudaMalloc((void **)&d_recim0, sizeof(uint8_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_recim1, sizeof(uint8_t)*size));
@@ -255,25 +255,23 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
     cudaEventCreate(&stop);
 #endif
 
+uint8_t *d_srcim0 = d_rawim0;
+    uint8_t *d_srcim1 = d_rawim1;
     // Infrared Noise Simulation
-    uint8_t *d_dstim0 = rectified ? d_recim0 : d_im0;
-    uint8_t *d_dstim1 = rectified ? d_recim1 : d_im1;
     if (speckleShape > 0) {
-        gpuErrCheck(cudaDeviceSynchronize());
 #ifdef PRINT_RUNTIME
         cudaEventRecord(start);
 #endif
-        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(d_rawim0, d_dstim0, d_irNoiseStates0, rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
-        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream2>>>(d_rawim1, d_dstim1, d_irNoiseStates1, rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
+        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(d_rawim0, d_noisyim0, d_irNoiseStates0, rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
+        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream2>>>(d_rawim1, d_noisyim1, d_irNoiseStates1, rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
 #ifdef PRINT_RUNTIME
         cudaEventRecord(stop);
         gpuErrCheck(cudaDeviceSynchronize());
         cudaEventElapsedTime(&runtime, start, stop);
         printf("Runtime of IR noise simulation: %f ms\n", runtime);
 #endif
-    } else {
-        gpuErrCheck(cudaMemcpyAsync(d_dstim0, d_rawim0, sizeof(uint8_t)*size, cudaMemcpyDeviceToDevice));
-        gpuErrCheck(cudaMemcpyAsync(d_dstim1, d_rawim1, sizeof(uint8_t)*size, cudaMemcpyDeviceToDevice));
+        d_srcim0 = d_noisyim0;
+        d_srcim1 = d_noisyim1;
     }
 
     // Rectification
@@ -282,14 +280,16 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
 #ifdef PRINT_RUNTIME
         cudaEventRecord(start);
 #endif
-        remap<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_mapLx, d_mapLy, d_im0, d_recim0, rows, cols);
-        remap<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream2>>>(d_mapRx, d_mapRy, d_im1, d_recim1, rows, cols);
+        remap<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_mapLx, d_mapLy, d_srcim0, d_recim0, rows, cols);
+        remap<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream2>>>(d_mapRx, d_mapRy, d_srcim1, d_recim1, rows, cols);
 #ifdef PRINT_RUNTIME
         cudaEventRecord(stop);
         gpuErrCheck(cudaDeviceSynchronize());
         cudaEventElapsedTime(&runtime, start, stop);
         printf("Runtime of rectification: %f ms\n", runtime);
 #endif
+        d_srcim0 = d_recim0;
+        d_srcim1 = d_recim1;
     }
 
     // Center-symmetric census transform
@@ -306,7 +306,7 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
 #ifdef PRINT_RUNTIME
     cudaEventRecord(start);
 #endif
-    CSCT<<<CSCTGridSize, CSCTBlockSize, CSCTSharedMemSize, stream1>>>(d_recim0, d_recim1, d_census0, d_census1, rows, cols, censusWidth, censusHeight);
+    CSCT<<<CSCTGridSize, CSCTBlockSize, CSCTSharedMemSize, stream1>>>(d_srcim0, d_srcim1, d_census0, d_census1, rows, cols, censusWidth, censusHeight);
 #ifdef PRINT_RUNTIME
     cudaEventRecord(stop);
     gpuErrCheck(cudaDeviceSynchronize());
@@ -509,8 +509,8 @@ DepthSensorEngine::~DepthSensorEngine() {
     gpuErrCheck(cudaFree(d_rawim0));
     gpuErrCheck(cudaFree(d_rawim1));
     if (!rectified) {
-        gpuErrCheck(cudaFree(d_im0));
-        gpuErrCheck(cudaFree(d_im1));
+        gpuErrCheck(cudaFree(d_noisyim0));
+        gpuErrCheck(cudaFree(d_noisyim1));
     }
     gpuErrCheck(cudaFree(d_recim0));
     gpuErrCheck(cudaFree(d_recim1));
