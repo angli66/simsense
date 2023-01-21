@@ -41,8 +41,9 @@ Mat2d<T> ndarray2Mat2d(py::array_t<T> arr) {
 
 template <class T>
 py::array_t<T> Mat2d2ndarray(Mat2d<T> arr) {
-    py::str NO_COPY; // Magic to let pybind create array without copying
-    py::array_t<T> new_arr = py::array({arr.rows(), arr.cols()}, arr.data(), NO_COPY);
+    // py::str NO_COPY; // Magic to let pybind create array without copying
+    // py::array_t<T> new_arr = py::array({arr.rows(), arr.cols()}, arr.data(), NO_COPY);
+    py::array_t<T> new_arr = py::array({arr.rows(), arr.cols()}, arr.data());
     return new_arr;
 }
 
