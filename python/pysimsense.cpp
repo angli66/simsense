@@ -27,10 +27,10 @@ PYBIND11_MODULE(pysimsense, m) {
         >()
     );
     PySimsense.def("compute", &simsense::DepthSensorEngine::compute);
-    PySimsense.def("_set_ir_noise_parameters", &simsense::DepthSensorEngine::setInfraredNoiseParameters);
-    PySimsense.def("_set_census_window_size", &simsense::DepthSensorEngine::setCensusWindowSize);
-    PySimsense.def("_set_matching_block_size", &simsense::DepthSensorEngine::setMatchingBlockSize);
-    PySimsense.def("_set_penalties", &simsense::DepthSensorEngine::setPenalties);
-    PySimsense.def("_set_uniqueness_ratio", &simsense::DepthSensorEngine::setUniquenessRatio);
-    PySimsense.def("_set_lr_max_diff", &simsense::DepthSensorEngine::setLrMaxDiff);
+    PySimsense.def("set_ir_noise_parameters", &simsense::DepthSensorEngine::setInfraredNoiseParameters);
+    PySimsense.def("set_census_window_size", &simsense::DepthSensorEngine::setCensusWindowSize);
+    PySimsense.def("set_matching_block_size", &simsense::DepthSensorEngine::setMatchingBlockSize);
+    PySimsense.def("set_penalties", &simsense::DepthSensorEngine::setPenalties);
+    PySimsense.def("set_uniqueness_ratio", &simsense::DepthSensorEngine::setUniquenessRatio);
+    PySimsense.def("set_lr_max_diff", &simsense::DepthSensorEngine::setLrMaxDiff);
 }
