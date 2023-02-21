@@ -1,4 +1,9 @@
+#include <curand.h>
+#include <curand_kernel.h>
+#include <dlpack/dlpack.h>
+#include <iostream>
 #include <simsense/core.h>
+#include <simsense/util.h>
 #include <simsense/camera.h>
 #include <simsense/csct.h>
 #include <simsense/cost.h>
@@ -7,14 +12,6 @@
 #include <simsense/lrcheck.h>
 #include <simsense/filter.h>
 
-#define gpuErrCheck(ans) { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
-   if (code != cudaSuccess) {
-      fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) { exit(code); }
-   }
-}
-
 namespace simsense {
 
 // Constructor without registration
@@ -22,7 +19,8 @@ DepthSensorEngine::DepthSensorEngine(
         uint32_t _rows, uint32_t _cols, float _focalLen, float _baselineLen, float _minDepth, float _maxDepth, uint64_t infraredNoiseSeed,
         float _speckleShape, float _speckleScale, float _gaussianMu, float _gaussianSigma, bool _rectified, uint8_t _censusWidth, uint8_t _censusHeight,
         uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight, uint8_t _p1, uint8_t _p2, uint8_t _uniqRatio, uint8_t _lrMaxDiff,
-        uint8_t _mfSize, py::array_t<float> map_lx, py::array_t<float> map_ly, py::array_t<float> map_rx, py::array_t<float> map_ry
+        uint8_t _mfSize, py::array_t<float> map_lx, py::array_t<float> map_ly, py::array_t<float> map_rx, py::array_t<float> map_ry,
+        float _mainFx, float _mainFy, float _mainSkew, float _mainCx, float _mainCy
 ) {
     // Convert from python to C++
     Mat2d<float> mapLx = ndarray2Mat2d<float>(map_lx);
@@ -60,12 +58,18 @@ DepthSensorEngine::DepthSensorEngine(
     maxDepth = _maxDepth;
     rectified = _rectified;
     registration = false;
+    mainFx = _mainFx;
+    mainFy = _mainFy;
+    mainSkew = _mainSkew;
+    mainCx = _mainCx;
+    mainCy = _mainCy;
+    computed = false;
 
     // Allocate GPU memory
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates0, sizeof(curandState_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates1, sizeof(curandState_t)*size));
-    initInfraredNoise<<<rows, cols, 0, stream1>>>(d_irNoiseStates0, infraredNoiseSeed);
-    initInfraredNoise<<<rows, cols, 0, stream2>>>(d_irNoiseStates1, infraredNoiseSeed + 1);
+    initInfraredNoise<<<rows, cols, 0, stream1>>>(static_cast<curandState_t*>(d_irNoiseStates0), infraredNoiseSeed);
+    initInfraredNoise<<<rows, cols, 0, stream2>>>(static_cast<curandState_t*>(d_irNoiseStates1), infraredNoiseSeed + 1);
 
     gpuErrCheck(cudaMalloc((void **)&d_mapLx, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_mapLy, sizeof(float)*size));
@@ -110,7 +114,16 @@ DepthSensorEngine::DepthSensorEngine(
     h_disp = new float[size];
 #else
     gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
+    depthContainer = std::make_shared<cudaPtrContainer<float>>(d_depth);
     h_depth = new float[size];
+
+    gpuErrCheck(cudaMalloc((void **)&d_pc, sizeof(float)*3*size));
+    pcContainer = std::make_shared<cudaPtrContainer<float>>(d_pc);
+    h_pc = new float[3*size];
+
+    gpuErrCheck(cudaMalloc((void **)&d_rgbPc, sizeof(float)*6*size));
+    rgbPcContainer = std::make_shared<cudaPtrContainer<float>>(d_rgbPc);
+    h_rgbPc = new float[6*size];
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
@@ -123,7 +136,7 @@ DepthSensorEngine::DepthSensorEngine(
         bool _rectified, uint8_t _censusWidth, uint8_t _censusHeight, uint32_t _maxDisp, uint8_t _bfWidth, uint8_t _bfHeight, uint8_t _p1,
         uint8_t _p2, uint8_t _uniqRatio, uint8_t _lrMaxDiff, uint8_t _mfSize, py::array_t<float> map_lx, py::array_t<float> map_ly,
         py::array_t<float> map_rx, py::array_t<float> map_ry, py::array_t<float> _a1, py::array_t<float> _a2, py::array_t<float> _a3,
-        float _b1, float _b2, float _b3, bool _dilation
+        float _b1, float _b2, float _b3, bool _dilation, float _mainFx, float _mainFy, float _mainSkew, float _mainCx, float _mainCy
 ) {
     // Convert from python to C++
     Mat2d<float> mapLx = ndarray2Mat2d<float>(map_lx);
@@ -171,12 +184,18 @@ DepthSensorEngine::DepthSensorEngine(
     b1 = _b1;
     b2 = _b2;
     b3 = _b3;
+    mainFx = _mainFx;
+    mainFy = _mainFy;
+    mainSkew = _mainSkew;
+    mainCx = _mainCx;
+    mainCy = _mainCy;
+    computed = false;
 
     // Allocate GPU memory
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates0, sizeof(curandState_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates1, sizeof(curandState_t)*size));
-    initInfraredNoise<<<rows, cols, 0, stream1>>>(d_irNoiseStates0, infraredNoiseSeed);
-    initInfraredNoise<<<rows, cols, 0, stream2>>>(d_irNoiseStates1, infraredNoiseSeed + 1);
+    initInfraredNoise<<<rows, cols, 0, stream1>>>(static_cast<curandState_t*>(d_irNoiseStates0), infraredNoiseSeed);
+    initInfraredNoise<<<rows, cols, 0, stream2>>>(static_cast<curandState_t*>(d_irNoiseStates1), infraredNoiseSeed + 1);
 
     gpuErrCheck(cudaMalloc((void **)&d_mapLx, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_mapLy, sizeof(float)*size));
@@ -193,7 +212,7 @@ DepthSensorEngine::DepthSensorEngine(
     gpuErrCheck(cudaMalloc((void **)&d_noisyim1, sizeof(uint8_t)*size));
     if (!rectified) {
         gpuErrCheck(cudaMalloc((void **)&d_recim0, sizeof(uint8_t)*size));
-        gpuErrCheck(cudaMalloc((void **)&d_recim1, sizeof(uint8_t)*size));   
+        gpuErrCheck(cudaMalloc((void **)&d_recim1, sizeof(uint8_t)*size));
     }
 
     gpuErrCheck(cudaMalloc((void **)&d_census0, sizeof(uint32_t)*size));
@@ -229,13 +248,24 @@ DepthSensorEngine::DepthSensorEngine(
 
     gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_rgbDepth, sizeof(float)*rgbSize));
+    depthContainer = std::make_shared<cudaPtrContainer<float>>(d_rgbDepth);
     h_depth = new float[rgbSize];
+
+    gpuErrCheck(cudaMalloc((void **)&d_pc, sizeof(float)*3*rgbSize));
+    pcContainer = std::make_shared<cudaPtrContainer<float>>(d_pc);
+    h_pc = new float[3*rgbSize];
+
+    gpuErrCheck(cudaMalloc((void **)&d_rgbPc, sizeof(float)*6*rgbSize));
+    rgbPcContainer = std::make_shared<cudaPtrContainer<float>>(d_rgbPc);
+    h_rgbPc = new float[6*rgbSize];
 #endif
 
     gpuErrCheck(cudaDeviceSynchronize());
 }
 
-py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray, py::array_t<uint8_t> right_ndarray) {
+void DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray, py::array_t<uint8_t> right_ndarray) {
+    computed = false; // Start computing
+
     // Convert from ndarray to Mat2d
     Mat2d<uint8_t> left = ndarray2Mat2d<uint8_t>(left_ndarray);
     Mat2d<uint8_t> right = ndarray2Mat2d<uint8_t>(right_ndarray);
@@ -247,6 +277,325 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
     // Upload to GPU
     gpuErrCheck(cudaMemcpyAsync(d_rawim0, left.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
     gpuErrCheck(cudaMemcpyAsync(d_rawim1, right.data(), sizeof(uint8_t)*size, cudaMemcpyHostToDevice));
+
+    computeDepth(d_rawim0, d_rawim1); // Result stored at d_rgbDepth or d_depth
+    computed = true; // Computation done
+}
+
+void DepthSensorEngine::compute(py::capsule left_capsule, py::capsule right_capsule) {
+    computed = false; // Start computing
+
+    // Open left capsule
+    auto leftCapsule = left_capsule.ptr();
+    DLManagedTensor *leftDLMTensor = (DLManagedTensor *)PyCapsule_GetPointer(leftCapsule, "dltensor");
+    if (leftDLMTensor) {
+        PyCapsule_SetName(leftCapsule, "used_dltensor"); // Successfully obtained content, rename capsule
+    } else {
+        throw std::runtime_error("Left capsule is invalid. Note that DLTensor capsules can only be consumed once");
+    }
+
+    // Open right capsule
+    auto *rightCapsule = right_capsule.ptr();
+    DLManagedTensor *rightDLMTensor = (DLManagedTensor *)PyCapsule_GetPointer(rightCapsule, "dltensor");
+    if (rightDLMTensor) {
+        PyCapsule_SetName(rightCapsule, "used_dltensor"); // Successfully obtained content, rename capsule
+    } else {
+        throw std::runtime_error("Right capsule is invalid. Note that DLTensor capsules can only be consumed once");
+    }
+
+    // Instance check
+    if (leftDLMTensor->dl_tensor.shape[0] != rightDLMTensor->dl_tensor.shape[0] ||
+        leftDLMTensor->dl_tensor.shape[1] != rightDLMTensor->dl_tensor.shape[1]) {
+        throw std::runtime_error("Both images must have the same size");
+    }
+    if (cols != leftDLMTensor->dl_tensor.shape[1] || rows != leftDLMTensor->dl_tensor.shape[0]) {
+        throw std::runtime_error("Input image size different from initiated");
+    }
+
+    // Get infrared (first) channel from the given RGBA data and convert float to uint8_t
+    processDLTensor<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>((float *)leftDLMTensor->dl_tensor.data, d_rawim0, rows, cols);
+    processDLTensor<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream2>>>((float *)rightDLMTensor->dl_tensor.data, d_rawim1, rows, cols);
+
+    computeDepth(d_rawim0, d_rawim1); // Result stored at d_rgbDepth or d_depth
+    computed = true; // Computation done
+
+    // Release DLMTensor
+    leftDLMTensor->deleter(const_cast<DLManagedTensor *>(leftDLMTensor));
+    rightDLMTensor->deleter(const_cast<DLManagedTensor *>(rightDLMTensor));
+}
+
+py::array_t<float> DepthSensorEngine::getNdarray() {
+    if (!computed) { throw std::runtime_error("No computed data stored"); }
+
+    // Download to CPU
+    if (registration) {
+        gpuErrCheck(cudaMemcpy(h_depth, d_rgbDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToHost));
+        Mat2d<float> depth(rgbRows, rgbCols, h_depth);
+        py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
+        return depth_ndarray;
+    } else {
+        gpuErrCheck(cudaMemcpy(h_depth, d_depth, sizeof(float)*size, cudaMemcpyDeviceToHost));
+        Mat2d<float> depth(rows, cols, h_depth);
+        py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
+        return depth_ndarray;
+    }
+}
+
+py::capsule DepthSensorEngine::getDLTensor() {
+    if (!computed) { throw std::runtime_error("No computed data stored"); }
+
+    // Wrap DLManagedTensor
+    DLManagedTensor *tensor = new DLManagedTensor();
+    tensor->dl_tensor.data = (registration) ? d_rgbDepth : d_depth;
+    int cudaId;
+    gpuErrCheck(cudaGetDevice(&cudaId));
+    tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
+    tensor->dl_tensor.ndim = 2;
+    tensor->dl_tensor.dtype = {2, 32, 1};
+    int64_t *shape = new int64_t[2];
+    if (registration) { shape[0] = rgbRows; shape[1] = rgbCols; }
+    else { shape[0] = rows; shape[1] = cols; }
+    tensor->dl_tensor.shape = shape;
+    tensor->dl_tensor.strides = nullptr;
+    tensor->dl_tensor.byte_offset = 0;
+    auto *containerCopy = new std::shared_ptr<cudaPtrContainer<float>>(depthContainer);
+    tensor->manager_ctx = containerCopy;
+    tensor->deleter = DLMTensorDeleter<cudaPtrContainer<float>>;
+
+    // Return PyCasule
+    return py::capsule(tensor, "dltensor", DLCapsuleDeleter);
+}
+
+py::array_t<float> DepthSensorEngine::getPointCloudNdarray() {
+    if (!computed) { throw std::runtime_error("No computed data stored"); }
+
+    int localRows = registration ? rgbRows : rows;
+    int localCols = registration ? rgbCols : cols;
+    int localSize = registration ? rgbSize : size;
+    float *d_localDepth = registration ? d_rgbDepth : d_depth;
+
+    // Raise depth to point cloud
+    depth2PointCloud<<<(localSize+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+        d_localDepth, d_pc, localRows, localCols, mainFx, mainFy, mainSkew, mainCx, mainCy
+    );
+    gpuErrCheck(cudaDeviceSynchronize());
+
+    // Download to CPU
+    gpuErrCheck(cudaMemcpy(h_pc, d_pc, sizeof(float)*3*localSize, cudaMemcpyDeviceToHost));
+    Mat2d<float> pc(localSize, 3, h_pc);
+    py::array_t<float> pc_ndarray = Mat2d2ndarray<float>(pc);
+    return pc_ndarray;
+}
+
+py::capsule DepthSensorEngine::getPointCloudDLTensor() {
+    if (!computed) { throw std::runtime_error("No computed data stored"); }
+
+    int localRows = registration ? rgbRows : rows;
+    int localCols = registration ? rgbCols : cols;
+    int localSize = registration ? rgbSize : size;
+    float *d_localDepth = registration ? d_rgbDepth : d_depth;
+
+    // Raise depth to point cloud
+    depth2PointCloud<<<(localSize+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+        d_localDepth, d_pc, localRows, localCols, mainFx, mainFy, mainSkew, mainCx, mainCy
+    );
+    gpuErrCheck(cudaDeviceSynchronize());
+
+    // Wrap DLManagedTensor
+    DLManagedTensor *tensor = new DLManagedTensor();
+    tensor->dl_tensor.data = d_pc;
+    int cudaId;
+    gpuErrCheck(cudaGetDevice(&cudaId));
+    tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
+    tensor->dl_tensor.ndim = 2;
+    tensor->dl_tensor.dtype = {2, 32, 1};
+    int64_t *shape = new int64_t[2];
+    shape[0] = localSize; shape[1] = 3;
+    tensor->dl_tensor.shape = shape;
+    tensor->dl_tensor.strides = nullptr;
+    tensor->dl_tensor.byte_offset = 0;
+    auto *containerCopy = new std::shared_ptr<cudaPtrContainer<float>>(pcContainer);
+    tensor->manager_ctx = containerCopy;
+    tensor->deleter = DLMTensorDeleter<cudaPtrContainer<float>>;
+
+    // Return PyCasule
+    return py::capsule(tensor, "dltensor", DLCapsuleDeleter);
+}
+
+py::array_t<float> DepthSensorEngine::getRgbPointCloudNdarray(py::capsule rgba_capsule) {
+    if (!computed) { throw std::runtime_error("No computed data stored"); }
+
+    // Open rgb capsule
+    auto rgbaCapsule = rgba_capsule.ptr();
+    DLManagedTensor *rgbaDLMTensor = (DLManagedTensor *)PyCapsule_GetPointer(rgbaCapsule, "dltensor");
+    if (rgbaDLMTensor) {
+        PyCapsule_SetName(rgbaCapsule, "used_dltensor"); // Successfully obtained content, rename capsule
+    } else {
+        throw std::runtime_error("RGBA capsule is invalid. Note that DLTensor capsules can only be consumed once");
+    }
+
+    int localRows = registration ? rgbRows : rows;
+    int localCols = registration ? rgbCols : cols;
+    int localSize = registration ? rgbSize : size;
+    float *d_localDepth = registration ? d_rgbDepth : d_depth;
+
+    // Raise depth to point cloud
+    depth2RgbPointCloud<<<(localSize+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+        d_localDepth, (float *)rgbaDLMTensor->dl_tensor.data, d_rgbPc, localRows, localCols, mainFx, mainFy, mainSkew, mainCx, mainCy
+    );
+    gpuErrCheck(cudaDeviceSynchronize());
+
+    // Download to CPU
+    gpuErrCheck(cudaMemcpy(h_rgbPc, d_rgbPc, sizeof(float)*6*localSize, cudaMemcpyDeviceToHost));
+    Mat2d<float> rgbPc(localSize, 6, h_rgbPc);
+    py::array_t<float> rgbPc_ndarray = Mat2d2ndarray<float>(rgbPc);
+
+    // Release DLMTensor
+    rgbaDLMTensor->deleter(const_cast<DLManagedTensor *>(rgbaDLMTensor));
+
+    return rgbPc_ndarray;
+}
+
+py::capsule DepthSensorEngine::getRgbPointCloudDLTensor(py::capsule rgba_capsule) {
+    if (!computed) { throw std::runtime_error("No computed data stored"); }
+
+    // Open rgb capsule
+    auto rgbaCapsule = rgba_capsule.ptr();
+    DLManagedTensor *rgbaDLMTensor = (DLManagedTensor *)PyCapsule_GetPointer(rgbaCapsule, "dltensor");
+    if (rgbaDLMTensor) {
+        PyCapsule_SetName(rgbaCapsule, "used_dltensor"); // Successfully obtained content, rename capsule
+    } else {
+        throw std::runtime_error("RGBA capsule is invalid. Note that DLTensor capsules can only be consumed once");
+    }
+
+    int localRows = registration ? rgbRows : rows;
+    int localCols = registration ? rgbCols : cols;
+    int localSize = registration ? rgbSize : size;
+    float *d_localDepth = registration ? d_rgbDepth : d_depth;
+
+    // Raise depth to point cloud
+    depth2RgbPointCloud<<<(localSize+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+        d_localDepth, (float *)rgbaDLMTensor->dl_tensor.data, d_rgbPc, localRows, localCols, mainFx, mainFy, mainSkew, mainCx, mainCy
+    );
+    gpuErrCheck(cudaDeviceSynchronize());
+
+    // Wrap DLManagedTensor
+    DLManagedTensor *tensor = new DLManagedTensor();
+    tensor->dl_tensor.data = d_rgbPc;
+    int cudaId;
+    gpuErrCheck(cudaGetDevice(&cudaId));
+    tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
+    tensor->dl_tensor.ndim = 2;
+    tensor->dl_tensor.dtype = {2, 32, 1};
+    int64_t *shape = new int64_t[2];
+    shape[0] = localSize; shape[1] = 6;
+    tensor->dl_tensor.shape = shape;
+    tensor->dl_tensor.strides = nullptr;
+    tensor->dl_tensor.byte_offset = 0;
+    auto *containerCopy = new std::shared_ptr<cudaPtrContainer<float>>(rgbPcContainer);
+    tensor->manager_ctx = containerCopy;
+    tensor->deleter = DLMTensorDeleter<cudaPtrContainer<float>>;
+
+    // Release DLMTensor
+    rgbaDLMTensor->deleter(const_cast<DLManagedTensor *>(rgbaDLMTensor));
+
+    // Return PyCasule
+    return py::capsule(tensor, "dltensor", DLCapsuleDeleter);
+}
+
+void DepthSensorEngine::setInfraredNoiseParameters(float _speckleShape, float _speckleScale, float _gaussianMu, float _gaussianSigma) {
+    speckleShape = _speckleShape;
+    speckleScale = _speckleScale;
+    gaussianMu = _gaussianMu;
+    gaussianSigma = _gaussianSigma;
+}
+
+void DepthSensorEngine::setPenalties(uint8_t _p1, uint8_t _p2) {
+    p1 = _p1;
+    p2 = _p2;
+}
+
+void DepthSensorEngine::setCensusWindowSize(uint8_t _censusWidth, uint8_t _censusHeight) {
+    censusWidth = _censusWidth;
+    censusHeight = _censusHeight;
+}
+
+void DepthSensorEngine::setMatchingBlockSize(uint8_t _bfWidth, uint8_t _bfHeight) {
+    bfWidth = _bfWidth;
+    bfHeight = _bfHeight;
+}
+
+void DepthSensorEngine::setUniquenessRatio(uint8_t _uniqRatio) {
+    uniqRatio = _uniqRatio;
+}
+
+void DepthSensorEngine::setLrMaxDiff(uint8_t _lrMaxDiff) {
+    lrMaxDiff = _lrMaxDiff;
+}
+
+DepthSensorEngine::~DepthSensorEngine() {
+    gpuErrCheck(cudaStreamDestroy(stream1));
+    gpuErrCheck(cudaStreamDestroy(stream2));
+    gpuErrCheck(cudaStreamDestroy(stream3));
+
+    gpuErrCheck(cudaFree(d_irNoiseStates0));
+    gpuErrCheck(cudaFree(d_irNoiseStates1));
+
+    gpuErrCheck(cudaFree(d_mapLx));
+    gpuErrCheck(cudaFree(d_mapLy));
+    gpuErrCheck(cudaFree(d_mapRx));
+    gpuErrCheck(cudaFree(d_mapRy));
+
+    gpuErrCheck(cudaFree(d_rawim0));
+    gpuErrCheck(cudaFree(d_rawim1));
+    gpuErrCheck(cudaFree(d_noisyim0));
+    gpuErrCheck(cudaFree(d_noisyim1));
+    if (!rectified) {
+        gpuErrCheck(cudaFree(d_recim0));
+        gpuErrCheck(cudaFree(d_recim1));   
+    }
+
+    gpuErrCheck(cudaFree(d_census0));
+    gpuErrCheck(cudaFree(d_census1));
+    
+    if (bfWidth * bfHeight != 1) {
+        gpuErrCheck(cudaFree(d_rawcost));
+        gpuErrCheck(cudaFree(d_hsum));
+    }
+    gpuErrCheck(cudaFree(d_cost));
+
+    gpuErrCheck(cudaFree(d_L0));
+    gpuErrCheck(cudaFree(d_L1));
+    gpuErrCheck(cudaFree(d_L2));
+    gpuErrCheck(cudaFree(d_LAll));
+
+    gpuErrCheck(cudaFree(d_leftDisp));
+    gpuErrCheck(cudaFree(d_rightDisp));
+
+    if (mfSize != 1) {
+        gpuErrCheck(cudaFree(d_filteredDisp));
+    }
+
+#ifdef DISP_ONLY
+    delete h_disp;
+#else
+    if (registration) {
+        gpuErrCheck(cudaFree(d_a1));
+        gpuErrCheck(cudaFree(d_a2));
+        gpuErrCheck(cudaFree(d_a3));
+        gpuErrCheck(cudaFree(d_depth)); // d_rgbDepth is managed by container instead of d_depth
+    }
+    delete h_depth;
+    delete h_pc;
+    delete h_rgbPc;
+#endif
+
+    gpuErrCheck(cudaDeviceSynchronize());
+}
+
+__forceinline__
+void DepthSensorEngine::computeDepth(uint8_t *d_rawim0, uint8_t *d_rawim1) {
+    gpuErrCheck(cudaDeviceSynchronize());
 
 #ifdef PRINT_RUNTIME
     float runtime;
@@ -262,8 +611,8 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
 #ifdef PRINT_RUNTIME
         cudaEventRecord(start);
 #endif
-        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(d_srcim0, d_noisyim0, d_irNoiseStates0, rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
-        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream2>>>(d_srcim1, d_noisyim1, d_irNoiseStates1, rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
+        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream1>>>(d_srcim0, d_noisyim0, static_cast<curandState_t*>(d_irNoiseStates0), rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
+        simInfraredNoise<<<(size+WARP_SIZE-1)/(WARP_SIZE), WARP_SIZE, 0, stream2>>>(d_srcim1, d_noisyim1, static_cast<curandState_t*>(d_irNoiseStates1), rows, cols, speckleShape, speckleScale, gaussianMu, gaussianSigma);
 #ifdef PRINT_RUNTIME
         cudaEventRecord(stop);
         gpuErrCheck(cudaDeviceSynchronize());
@@ -439,117 +788,12 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         cudaEventElapsedTime(&runtime, start, stop);
         printf("Runtime of registration: %f ms\n", runtime);
 #endif
-        
-        // GPU to CPU transfer
-        gpuErrCheck(cudaDeviceSynchronize());
-        gpuErrCheck(cudaMemcpy(h_depth, d_rgbDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToHost));
-        Mat2d<float> depth(rgbRows, rgbCols, h_depth);
-        
-        // Convert from Mat2d to ndarray
-        py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
-        return depth_ndarray;
     } else {
         correctDepthRange<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_depth, size, minDepth, maxDepth);
-        
-        // GPU to CPU transfer
-        gpuErrCheck(cudaDeviceSynchronize());
-        gpuErrCheck(cudaMemcpy(h_depth, d_depth, sizeof(float)*size, cudaMemcpyDeviceToHost));
-        Mat2d<float> depth(rows, cols, h_depth);
-
-        // Convert from Mat2d to ndarray
-        py::array_t<float> depth_ndarray = Mat2d2ndarray<float>(depth);
-        return depth_ndarray;
     }
-#endif
-}
-
-void DepthSensorEngine::setInfraredNoiseParameters(float _speckleShape, float _speckleScale, float _gaussianMu, float _gaussianSigma) {
-    speckleShape = _speckleShape;
-    speckleScale = _speckleScale;
-    gaussianMu = _gaussianMu;
-    gaussianSigma = _gaussianSigma;
-}
-
-void DepthSensorEngine::setPenalties(uint8_t _p1, uint8_t _p2) {
-    p1 = _p1;
-    p2 = _p2;
-}
-
-void DepthSensorEngine::setCensusWindowSize(uint8_t _censusWidth, uint8_t _censusHeight) {
-    censusWidth = _censusWidth;
-    censusHeight = _censusHeight;
-}
-
-void DepthSensorEngine::setMatchingBlockSize(uint8_t _bfWidth, uint8_t _bfHeight) {
-    bfWidth = _bfWidth;
-    bfHeight = _bfHeight;
-}
-
-void DepthSensorEngine::setUniquenessRatio(uint8_t _uniqRatio) {
-    uniqRatio = _uniqRatio;
-}
-
-void DepthSensorEngine::setLrMaxDiff(uint8_t _lrMaxDiff) {
-    lrMaxDiff = _lrMaxDiff;
-}
-
-DepthSensorEngine::~DepthSensorEngine() {
-    gpuErrCheck(cudaStreamDestroy(stream1));
-    gpuErrCheck(cudaStreamDestroy(stream2));
-    gpuErrCheck(cudaStreamDestroy(stream3));
-
-    gpuErrCheck(cudaFree(d_irNoiseStates0));
-    gpuErrCheck(cudaFree(d_irNoiseStates1));
-
-    gpuErrCheck(cudaFree(d_mapLx));
-    gpuErrCheck(cudaFree(d_mapLy));
-    gpuErrCheck(cudaFree(d_mapRx));
-    gpuErrCheck(cudaFree(d_mapRy));
-
-    gpuErrCheck(cudaFree(d_rawim0));
-    gpuErrCheck(cudaFree(d_rawim1));
-    gpuErrCheck(cudaFree(d_noisyim0));
-    gpuErrCheck(cudaFree(d_noisyim1));
-    if (!rectified) {
-        gpuErrCheck(cudaFree(d_recim0));
-        gpuErrCheck(cudaFree(d_recim1));
-    }
-
-    gpuErrCheck(cudaFree(d_census0));
-    gpuErrCheck(cudaFree(d_census1));
-    
-    if (bfWidth * bfHeight != 1) {
-        gpuErrCheck(cudaFree(d_rawcost));
-        gpuErrCheck(cudaFree(d_hsum));
-    }
-    gpuErrCheck(cudaFree(d_cost));
-
-    gpuErrCheck(cudaFree(d_L0));
-    gpuErrCheck(cudaFree(d_L1));
-    gpuErrCheck(cudaFree(d_L2));
-    gpuErrCheck(cudaFree(d_LAll));
-
-    gpuErrCheck(cudaFree(d_leftDisp));
-    gpuErrCheck(cudaFree(d_rightDisp));
-
-    if (mfSize != 1) {
-        gpuErrCheck(cudaFree(d_filteredDisp));
-    }
-
-#ifdef DISP_ONLY
-    delete h_disp;
-#else
-    gpuErrCheck(cudaFree(d_depth));
-    if (registration) {
-        gpuErrCheck(cudaFree(d_a1));
-        gpuErrCheck(cudaFree(d_a2));
-        gpuErrCheck(cudaFree(d_a3));
-        gpuErrCheck(cudaFree(d_rgbDepth));
-    }
-    delete h_depth;
-#endif
 
     gpuErrCheck(cudaDeviceSynchronize());
+#endif
 }
 
 }

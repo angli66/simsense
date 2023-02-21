@@ -155,4 +155,46 @@ void correctDepthRange(float *depth, const int size, const float minDepth, const
     if (depth[pos] < minDepth || depth[pos] >= maxDepth) { depth[pos] = 0; }
 }
 
+__global__
+void depth2PointCloud(const float *depth, float *pc, const int rows, const int cols, const float fx, const float fy,
+                        const float s, const float cx, const float cy) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= rows * cols) { return; }
+
+    const int u = pos % cols;
+    const int v = pos / cols;
+
+    // x right, y down, z forward
+    float z = depth[pos];
+    float x = z * ((u - cx) / fx + s * (cy - v) / (fx * fy));
+    float y = z * (v - cy) / fy;
+
+    pc[3*pos] = x;
+    pc[3*pos + 1] = y;
+    pc[3*pos + 2] = z;
+}
+
+__global__
+void depth2RgbPointCloud(const float *depth, const float *rgba, float *pc, const int rows, const int cols, const float fx,
+                            const float fy, const float s, const float cx, const float cy) {
+    const int pos = blockIdx.x * blockDim.x + threadIdx.x;
+    if (pos >= rows * cols) { return; }
+
+    const int u = pos % cols;
+    const int v = pos / cols;
+
+    // x right, y down, z forward
+    float z = depth[pos];
+    float x = z * ((u - cx) / fx + s * (cy - v) / (fx * fy));
+    float y = z * (v - cy) / fy;
+
+    // (x, y, z, r, g, b)
+    pc[6*pos] = x;
+    pc[6*pos + 1] = y;
+    pc[6*pos + 2] = z;
+    pc[6*pos + 3] = rgba[4*pos];
+    pc[6*pos + 4] = rgba[4*pos + 1];
+    pc[6*pos + 5] = rgba[4*pos + 2];
+}
+
 }

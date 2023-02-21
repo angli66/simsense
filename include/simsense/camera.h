@@ -38,6 +38,14 @@ void depthDilation(float *depth, const int rgbRows, const int rgbCols, const flo
 __global__
 void correctDepthRange(float *depth, const int size, const float minDepth, const float maxDepth);
 
+__global__
+void depth2PointCloud(const float *depth, float *pc, const int rows, const int cols, const float fx, const float fy,
+                        const float s, const float cx, const float cy);
+
+__global__
+void depth2RgbPointCloud(const float *depth, const float *rgba, float *pc, const int rows, const int cols, const float fx,
+                            const float fy, const float s, const float cx, const float cy);
+
 }
 
 #endif
