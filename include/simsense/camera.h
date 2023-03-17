@@ -5,7 +5,7 @@
 #include <cmath>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <simsense/config.h>
+#include "config.h"
 
 #define ERROR_MARGIN 0.01
 #define BORDER_VALUE 0

@@ -2,7 +2,7 @@
 #define SIMSENSE_AGGR_H
 
 #include <stdint.h>
-#include <simsense/config.h>
+#include "config.h"
 
 namespace simsense {
 
