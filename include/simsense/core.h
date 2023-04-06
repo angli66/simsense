@@ -5,6 +5,7 @@
 #include <driver_types.h>
 #include "util.h"
 #include "config.h"
+#include <cstdio>
 
 #define gpuErrCheck(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true) {
