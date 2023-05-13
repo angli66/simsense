@@ -8,4 +8,4 @@ file(GLOB_RECURSE SIMSENSE_SRC "src/*")
 add_library(simsense SHARED ${SIMSENSE_SRC})
 set_target_properties(simsense PROPERTIES CUDA_ARCHITECTURES "60;61;70;75;80;86") # Supporting GPU compute capabilities
 
-target_include_directories(simsense PUBLIC "include")
+target_include_directories(simsense PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>)
