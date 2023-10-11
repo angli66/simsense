@@ -15,8 +15,6 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
-// namespace py = pybind11;
-
 namespace simsense {
 
 void cudaFreeChecked(void *ptr) { gpuErrCheck(cudaFree(ptr)); }
@@ -24,7 +22,7 @@ void cudaFreeChecked(void *ptr) { gpuErrCheck(cudaFree(ptr)); }
 // Main sensor class
 class DepthSensorEngine {
 public:
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     DepthSensorEngine(
         uint32_t _rows, uint32_t _cols, float _focalLen, float _baselineLen, float _minDepth, float _maxDepth, uint64_t infraredNoiseSeed,
         float _speckleShape, float _speckleScale, float _gaussianMu, float _gaussianSigma, bool _rectified, uint8_t _censusWidth, uint8_t _censusHeight,
@@ -33,7 +31,7 @@ public:
         float _mainFx, float _mainFy, float _mainSkew, float _mainCx, float _mainCy
     );
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     DepthSensorEngine(
         uint32_t _rows, uint32_t _cols, uint32_t _rgbRows, uint32_t _rgbCols, float _focalLen, float _baselineLen, float _minDepth,
         float _maxDepth, uint64_t infraredNoiseSeed, float _speckleShape, float _speckleScale, float _gaussianMu, float _gaussianSigma,
@@ -43,28 +41,28 @@ public:
         float _b1, float _b2, float _b3, bool _dilation, float _mainFx, float _mainFy, float _mainSkew, float _mainCx, float _mainCy
     );
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     void compute(Mat2d<uint8_t> left, Mat2d<uint8_t> right);
     
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     void compute(DLManagedTensor *leftDLMTensor, DLManagedTensor *rightDLMTensor);
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     Mat2d<float> getMat2d();
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     DLManagedTensor* getDLTensor();
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     Mat2d<float> getPointCloudMat2d();
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     DLManagedTensor* getPointCloudDLTensor();
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     Mat2d<float> getRgbPointCloudMat2d(DLManagedTensor *rgbaDLMTensor);
 
-    __attribute__((visibility("default")))
+    // __attribute__((visibility("default")))
     DLManagedTensor* getRgbPointCloudDLTensor(DLManagedTensor *rgbaDLMTensor);
 
     void setInfraredNoiseParameters(float _speckleShape, float _speckleScale, float _gaussianMu, float _gaussianSigma);
@@ -92,8 +90,6 @@ protected:
     float focalLen, baselineLen, minDepth, maxDepth, b1, b2, b3;
     float mainFx, mainFy, mainSkew, mainCx, mainCy;
     bool rectified, registration, dilation, computed;
-    // std::shared_ptr<cudaPtrContainer<float>> depthContainer, pcContainer, rgbPcContainer;
-
     std::shared_ptr<float> depthContainer, pcContainer, rgbPcContainer;
 
     void computeDepth(uint8_t *d_rawim0, uint8_t *d_rawim1);
