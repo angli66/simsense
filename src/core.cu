@@ -11,7 +11,20 @@
 #include <curand_kernel.h>
 #include <iostream>
 
+#define gpuErrCheck(ans)                                                                          \
+  { gpuAssert((ans), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort = true) {
+  if (code != cudaSuccess) {
+    fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
+    if (abort) {
+      exit(code);
+    }
+  }
+}
+
 namespace simsense {
+
+void cudaFreeChecked(void *ptr) { gpuErrCheck(cudaFree(ptr)); }
 
 __global__ void float2uint8(const float *src, uint8_t *dst, const int rows, const int cols) {
   const int pos = blockIdx.x * blockDim.x + threadIdx.x;
