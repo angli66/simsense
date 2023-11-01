@@ -361,6 +361,19 @@ Mat2d<float> DepthSensorEngine::getMat2d() {
   }
 }
 
+int DepthSensorEngine::getCudaId() {
+  int cudaId;
+  gpuErrCheck(cudaGetDevice(&cudaId));
+  return cudaId;
+}
+
+void *DepthSensorEngine::getCudaPtr() {
+  if (!computed) {
+    throw std::runtime_error("No computed data stored");
+  }
+  return (registration) ? d_rgbDepth : d_depth;
+}
+
 // DLManagedTensor *DepthSensorEngine::getDLTensor() {
 //   if (!computed) {
 //     throw std::runtime_error("No computed data stored");

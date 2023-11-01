@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <driver_types.h>
 #include <stdint.h>
+#include <vector>
 
 namespace simsense {
 
@@ -41,6 +42,9 @@ public:
 
   Mat2d<float> getMat2d();
 
+  int getCudaId();
+  void *getCudaPtr();
+
   // DLManagedTensor *getDLTensor();
 
   Mat2d<float> getPointCloudMat2d();
@@ -51,8 +55,10 @@ public:
 
   // DLManagedTensor *getRgbPointCloudDLTensor(DLManagedTensor *rgbaDLMTensor);
 
-  uint32_t getRows() { return rows; }
-  uint32_t getCols() { return cols; }
+  uint32_t getInputRows() { return rows; }
+  uint32_t getInputCols() { return cols; }
+  uint32_t getOutputRows() { return (registration) ? rgbRows : rows; }
+  uint32_t getOutputCols() { return (registration) ? rgbCols : cols; }
   void setInfraredNoiseParameters(float _speckleShape, float _speckleScale, float _gaussianMu,
                                   float _gaussianSigma);
   void setPenalties(uint8_t _p1, uint8_t _p2);
