@@ -1,11 +1,9 @@
 #ifndef SIMSENSE_UTIL_H
 #define SIMSENSE_UTIL_H
 
-#include <dlpack/dlpack.h>
+// #include <dlpack/dlpack.h>
 #include "config.h"
 #include <memory>
-
-// namespace py = pybind11;
 
 namespace simsense {
 
@@ -25,11 +23,11 @@ private:
   T *m_data;
 };
 
-template <class T> void DLMTensorDeleter(DLManagedTensor *self) {
-  delete[] self->dl_tensor.shape;
-  delete static_cast<std::shared_ptr<T> *>(self->manager_ctx);
-  delete self;
-}
+// template <class T> void DLMTensorDeleter(DLManagedTensor *self) {
+//   delete[] self->dl_tensor.shape;
+//   delete static_cast<std::shared_ptr<T> *>(self->manager_ctx);
+//   delete self;
+// }
 
 } // namespace simsense
 

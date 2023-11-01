@@ -308,27 +308,41 @@ void DepthSensorEngine::compute(Mat2d<uint8_t> left, Mat2d<uint8_t> right) {
   computed = true;                  // Computation done
 }
 
-void DepthSensorEngine::compute(DLManagedTensor *leftDLMTensor, DLManagedTensor *rightDLMTensor) {
+void DepthSensorEngine::compute(void *leftCuda, void *rightCuda) {
   computed = false; // Start computing
-
-  // Instance check
-  if (leftDLMTensor->dl_tensor.shape[0] != rightDLMTensor->dl_tensor.shape[0] ||
-      leftDLMTensor->dl_tensor.shape[1] != rightDLMTensor->dl_tensor.shape[1]) {
-    throw std::runtime_error("Both images must have the same size");
-  }
-  if (cols != leftDLMTensor->dl_tensor.shape[1] || rows != leftDLMTensor->dl_tensor.shape[0]) {
-    throw std::runtime_error("Input image size different from initiated");
-  }
 
   // Get infrared (first) channel from the given RGBA data and convert float to uint8_t
   float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
-      (float *)leftDLMTensor->dl_tensor.data, d_rawim0, rows, cols);
+      (float *)leftCuda, d_rawim0, rows, cols);
   float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream2>>>(
-      (float *)rightDLMTensor->dl_tensor.data, d_rawim1, rows, cols);
+      (float *)rightCuda, d_rawim1, rows, cols);
 
   computeDepth(d_rawim0, d_rawim1); // Result stored at d_rgbDepth or d_depth
   computed = true;                  // Computation done
 }
+
+// void DepthSensorEngine::compute(DLManagedTensor *leftDLMTensor, DLManagedTensor *rightDLMTensor)
+// {
+//   computed = false; // Start computing
+
+//   // Instance check
+//   if (leftDLMTensor->dl_tensor.shape[0] != rightDLMTensor->dl_tensor.shape[0] ||
+//       leftDLMTensor->dl_tensor.shape[1] != rightDLMTensor->dl_tensor.shape[1]) {
+//     throw std::runtime_error("Both images must have the same size");
+//   }
+//   if (cols != leftDLMTensor->dl_tensor.shape[1] || rows != leftDLMTensor->dl_tensor.shape[0]) {
+//     throw std::runtime_error("Input image size different from initiated");
+//   }
+
+//   // Get infrared (first) channel from the given RGBA data and convert float to uint8_t
+//   float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+//       (float *)leftDLMTensor->dl_tensor.data, d_rawim0, rows, cols);
+//   float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream2>>>(
+//       (float *)rightDLMTensor->dl_tensor.data, d_rawim1, rows, cols);
+
+//   computeDepth(d_rawim0, d_rawim1); // Result stored at d_rgbDepth or d_depth
+//   computed = true;                  // Computation done
+// }
 
 Mat2d<float> DepthSensorEngine::getMat2d() {
   if (!computed) {
@@ -347,36 +361,36 @@ Mat2d<float> DepthSensorEngine::getMat2d() {
   }
 }
 
-DLManagedTensor *DepthSensorEngine::getDLTensor() {
-  if (!computed) {
-    throw std::runtime_error("No computed data stored");
-  }
+// DLManagedTensor *DepthSensorEngine::getDLTensor() {
+//   if (!computed) {
+//     throw std::runtime_error("No computed data stored");
+//   }
 
-  // Wrap DLManagedTensor
-  DLManagedTensor *tensor = new DLManagedTensor();
-  tensor->dl_tensor.data = (registration) ? d_rgbDepth : d_depth;
-  int cudaId;
-  gpuErrCheck(cudaGetDevice(&cudaId));
-  tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
-  tensor->dl_tensor.ndim = 2;
-  tensor->dl_tensor.dtype = {2, 32, 1};
-  int64_t *shape = new int64_t[2];
-  if (registration) {
-    shape[0] = rgbRows;
-    shape[1] = rgbCols;
-  } else {
-    shape[0] = rows;
-    shape[1] = cols;
-  }
-  tensor->dl_tensor.shape = shape;
-  tensor->dl_tensor.strides = nullptr;
-  tensor->dl_tensor.byte_offset = 0;
-  auto *containerCopy = new std::shared_ptr<float>(depthContainer);
-  tensor->manager_ctx = containerCopy;
-  tensor->deleter = DLMTensorDeleter<float>;
+//   // Wrap DLManagedTensor
+//   DLManagedTensor *tensor = new DLManagedTensor();
+//   tensor->dl_tensor.data = (registration) ? d_rgbDepth : d_depth;
+//   int cudaId;
+//   gpuErrCheck(cudaGetDevice(&cudaId));
+//   tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
+//   tensor->dl_tensor.ndim = 2;
+//   tensor->dl_tensor.dtype = {2, 32, 1};
+//   int64_t *shape = new int64_t[2];
+//   if (registration) {
+//     shape[0] = rgbRows;
+//     shape[1] = rgbCols;
+//   } else {
+//     shape[0] = rows;
+//     shape[1] = cols;
+//   }
+//   tensor->dl_tensor.shape = shape;
+//   tensor->dl_tensor.strides = nullptr;
+//   tensor->dl_tensor.byte_offset = 0;
+//   auto *containerCopy = new std::shared_ptr<float>(depthContainer);
+//   tensor->manager_ctx = containerCopy;
+//   tensor->deleter = DLMTensorDeleter<float>;
 
-  return tensor;
-}
+//   return tensor;
+// }
 
 Mat2d<float> DepthSensorEngine::getPointCloudMat2d() {
   if (!computed) {
@@ -399,101 +413,101 @@ Mat2d<float> DepthSensorEngine::getPointCloudMat2d() {
   return pc;
 }
 
-DLManagedTensor *DepthSensorEngine::getPointCloudDLTensor() {
-  if (!computed) {
-    throw std::runtime_error("No computed data stored");
-  }
+// DLManagedTensor *DepthSensorEngine::getPointCloudDLTensor() {
+//   if (!computed) {
+//     throw std::runtime_error("No computed data stored");
+//   }
 
-  int localRows = registration ? rgbRows : rows;
-  int localCols = registration ? rgbCols : cols;
-  int localSize = registration ? rgbSize : size;
-  float *d_localDepth = registration ? d_rgbDepth : d_depth;
+//   int localRows = registration ? rgbRows : rows;
+//   int localCols = registration ? rgbCols : cols;
+//   int localSize = registration ? rgbSize : size;
+//   float *d_localDepth = registration ? d_rgbDepth : d_depth;
 
-  // Raise depth to point cloud
-  depth2PointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
-      d_localDepth, d_pc, localRows, localCols, mainFx, mainFy, mainSkew, mainCx, mainCy);
-  gpuErrCheck(cudaDeviceSynchronize());
+//   // Raise depth to point cloud
+//   depth2PointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+//       d_localDepth, d_pc, localRows, localCols, mainFx, mainFy, mainSkew, mainCx, mainCy);
+//   gpuErrCheck(cudaDeviceSynchronize());
 
-  // Wrap DLManagedTensor
-  DLManagedTensor *tensor = new DLManagedTensor();
-  tensor->dl_tensor.data = d_pc;
-  int cudaId;
-  gpuErrCheck(cudaGetDevice(&cudaId));
-  tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
-  tensor->dl_tensor.ndim = 2;
-  tensor->dl_tensor.dtype = {2, 32, 1};
-  int64_t *shape = new int64_t[2];
-  shape[0] = localSize;
-  shape[1] = 3;
-  tensor->dl_tensor.shape = shape;
-  tensor->dl_tensor.strides = nullptr;
-  tensor->dl_tensor.byte_offset = 0;
-  auto *containerCopy = new std::shared_ptr<float>(pcContainer);
-  tensor->manager_ctx = containerCopy;
-  tensor->deleter = DLMTensorDeleter<float>;
+//   // Wrap DLManagedTensor
+//   DLManagedTensor *tensor = new DLManagedTensor();
+//   tensor->dl_tensor.data = d_pc;
+//   int cudaId;
+//   gpuErrCheck(cudaGetDevice(&cudaId));
+//   tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
+//   tensor->dl_tensor.ndim = 2;
+//   tensor->dl_tensor.dtype = {2, 32, 1};
+//   int64_t *shape = new int64_t[2];
+//   shape[0] = localSize;
+//   shape[1] = 3;
+//   tensor->dl_tensor.shape = shape;
+//   tensor->dl_tensor.strides = nullptr;
+//   tensor->dl_tensor.byte_offset = 0;
+//   auto *containerCopy = new std::shared_ptr<float>(pcContainer);
+//   tensor->manager_ctx = containerCopy;
+//   tensor->deleter = DLMTensorDeleter<float>;
 
-  return tensor;
-}
+//   return tensor;
+// }
 
-Mat2d<float> DepthSensorEngine::getRgbPointCloudMat2d(DLManagedTensor *rgbaDLMTensor) {
-  if (!computed) {
-    throw std::runtime_error("No computed data stored");
-  }
+// Mat2d<float> DepthSensorEngine::getRgbPointCloudMat2d(DLManagedTensor *rgbaDLMTensor) {
+//   if (!computed) {
+//     throw std::runtime_error("No computed data stored");
+//   }
 
-  int localRows = registration ? rgbRows : rows;
-  int localCols = registration ? rgbCols : cols;
-  int localSize = registration ? rgbSize : size;
-  float *d_localDepth = registration ? d_rgbDepth : d_depth;
+//   int localRows = registration ? rgbRows : rows;
+//   int localCols = registration ? rgbCols : cols;
+//   int localSize = registration ? rgbSize : size;
+//   float *d_localDepth = registration ? d_rgbDepth : d_depth;
 
-  // Raise depth to point cloud
-  depth2RgbPointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
-      d_localDepth, (float *)rgbaDLMTensor->dl_tensor.data, d_rgbPc, localRows, localCols, mainFx,
-      mainFy, mainSkew, mainCx, mainCy);
-  gpuErrCheck(cudaDeviceSynchronize());
+//   // Raise depth to point cloud
+//   depth2RgbPointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+//       d_localDepth, (float *)rgbaDLMTensor->dl_tensor.data, d_rgbPc, localRows, localCols,
+//       mainFx, mainFy, mainSkew, mainCx, mainCy);
+//   gpuErrCheck(cudaDeviceSynchronize());
 
-  // Download to CPU
-  gpuErrCheck(cudaMemcpy(h_rgbPc, d_rgbPc, sizeof(float) * 6 * localSize, cudaMemcpyDeviceToHost));
-  Mat2d<float> rgbPc(localSize, 6, h_rgbPc);
+//   // Download to CPU
+//   gpuErrCheck(cudaMemcpy(h_rgbPc, d_rgbPc, sizeof(float) * 6 * localSize,
+//   cudaMemcpyDeviceToHost)); Mat2d<float> rgbPc(localSize, 6, h_rgbPc);
 
-  return rgbPc;
-}
+//   return rgbPc;
+// }
 
-DLManagedTensor *DepthSensorEngine::getRgbPointCloudDLTensor(DLManagedTensor *rgbaDLMTensor) {
-  if (!computed) {
-    throw std::runtime_error("No computed data stored");
-  }
+// DLManagedTensor *DepthSensorEngine::getRgbPointCloudDLTensor(DLManagedTensor *rgbaDLMTensor) {
+//   if (!computed) {
+//     throw std::runtime_error("No computed data stored");
+//   }
 
-  int localRows = registration ? rgbRows : rows;
-  int localCols = registration ? rgbCols : cols;
-  int localSize = registration ? rgbSize : size;
-  float *d_localDepth = registration ? d_rgbDepth : d_depth;
+//   int localRows = registration ? rgbRows : rows;
+//   int localCols = registration ? rgbCols : cols;
+//   int localSize = registration ? rgbSize : size;
+//   float *d_localDepth = registration ? d_rgbDepth : d_depth;
 
-  // Raise depth to point cloud
-  depth2RgbPointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
-      d_localDepth, (float *)rgbaDLMTensor->dl_tensor.data, d_rgbPc, localRows, localCols, mainFx,
-      mainFy, mainSkew, mainCx, mainCy);
-  gpuErrCheck(cudaDeviceSynchronize());
+//   // Raise depth to point cloud
+//   depth2RgbPointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+//       d_localDepth, (float *)rgbaDLMTensor->dl_tensor.data, d_rgbPc, localRows, localCols,
+//       mainFx, mainFy, mainSkew, mainCx, mainCy);
+//   gpuErrCheck(cudaDeviceSynchronize());
 
-  // Wrap DLManagedTensor
-  DLManagedTensor *tensor = new DLManagedTensor();
-  tensor->dl_tensor.data = d_rgbPc;
-  int cudaId;
-  gpuErrCheck(cudaGetDevice(&cudaId));
-  tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
-  tensor->dl_tensor.ndim = 2;
-  tensor->dl_tensor.dtype = {2, 32, 1};
-  int64_t *shape = new int64_t[2];
-  shape[0] = localSize;
-  shape[1] = 6;
-  tensor->dl_tensor.shape = shape;
-  tensor->dl_tensor.strides = nullptr;
-  tensor->dl_tensor.byte_offset = 0;
-  auto *containerCopy = new std::shared_ptr<float>(rgbPcContainer);
-  tensor->manager_ctx = containerCopy;
-  tensor->deleter = DLMTensorDeleter<float>;
+//   // Wrap DLManagedTensor
+//   DLManagedTensor *tensor = new DLManagedTensor();
+//   tensor->dl_tensor.data = d_rgbPc;
+//   int cudaId;
+//   gpuErrCheck(cudaGetDevice(&cudaId));
+//   tensor->dl_tensor.device = {DLDeviceType::kDLGPU, cudaId};
+//   tensor->dl_tensor.ndim = 2;
+//   tensor->dl_tensor.dtype = {2, 32, 1};
+//   int64_t *shape = new int64_t[2];
+//   shape[0] = localSize;
+//   shape[1] = 6;
+//   tensor->dl_tensor.shape = shape;
+//   tensor->dl_tensor.strides = nullptr;
+//   tensor->dl_tensor.byte_offset = 0;
+//   auto *containerCopy = new std::shared_ptr<float>(rgbPcContainer);
+//   tensor->manager_ctx = containerCopy;
+//   tensor->deleter = DLMTensorDeleter<float>;
 
-  return tensor;
-}
+//   return tensor;
+// }
 
 void DepthSensorEngine::setInfraredNoiseParameters(float _speckleShape, float _speckleScale,
                                                    float _gaussianMu, float _gaussianSigma) {

@@ -35,20 +35,24 @@ public:
 
   void compute(Mat2d<uint8_t> left, Mat2d<uint8_t> right);
 
-  void compute(DLManagedTensor *leftDLMTensor, DLManagedTensor *rightDLMTensor);
+  void compute(void *leftCuda, void *rightCuda);
+
+  // void compute(DLManagedTensor *leftDLMTensor, DLManagedTensor *rightDLMTensor);
 
   Mat2d<float> getMat2d();
 
-  DLManagedTensor *getDLTensor();
+  // DLManagedTensor *getDLTensor();
 
   Mat2d<float> getPointCloudMat2d();
 
-  DLManagedTensor *getPointCloudDLTensor();
+  // DLManagedTensor *getPointCloudDLTensor();
 
-  Mat2d<float> getRgbPointCloudMat2d(DLManagedTensor *rgbaDLMTensor);
+  // Mat2d<float> getRgbPointCloudMat2d(DLManagedTensor *rgbaDLMTensor);
 
-  DLManagedTensor *getRgbPointCloudDLTensor(DLManagedTensor *rgbaDLMTensor);
+  // DLManagedTensor *getRgbPointCloudDLTensor(DLManagedTensor *rgbaDLMTensor);
 
+  uint32_t getRows() { return rows; }
+  uint32_t getCols() { return cols; }
   void setInfraredNoiseParameters(float _speckleShape, float _speckleScale, float _gaussianMu,
                                   float _gaussianSigma);
   void setPenalties(uint8_t _p1, uint8_t _p2);
