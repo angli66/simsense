@@ -308,19 +308,6 @@ void DepthSensorEngine::compute(Mat2d<uint8_t> left, Mat2d<uint8_t> right) {
   computed = true;                  // Computation done
 }
 
-void DepthSensorEngine::compute(void *leftCuda, void *rightCuda) {
-  computed = false; // Start computing
-
-  // Get infrared (first) channel from the given RGBA data and convert float to uint8_t
-  float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
-      (float *)leftCuda, d_rawim0, rows, cols);
-  float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream2>>>(
-      (float *)rightCuda, d_rawim1, rows, cols);
-
-  computeDepth(d_rawim0, d_rawim1); // Result stored at d_rgbDepth or d_depth
-  computed = true;                  // Computation done
-}
-
 // void DepthSensorEngine::compute(DLManagedTensor *leftDLMTensor, DLManagedTensor *rightDLMTensor)
 // {
 //   computed = false; // Start computing
@@ -344,6 +331,19 @@ void DepthSensorEngine::compute(void *leftCuda, void *rightCuda) {
 //   computed = true;                  // Computation done
 // }
 
+void DepthSensorEngine::compute(void *leftCuda, void *rightCuda) {
+  computed = false; // Start computing
+
+  // Get infrared (first) channel from the given RGBA data and convert float to uint8_t
+  float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+      (float *)leftCuda, d_rawim0, rows, cols);
+  float2uint8<<<(size + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream2>>>(
+      (float *)rightCuda, d_rawim1, rows, cols);
+
+  computeDepth(d_rawim0, d_rawim1); // Result stored at d_rgbDepth or d_depth
+  computed = true;                  // Computation done
+}
+
 Mat2d<float> DepthSensorEngine::getMat2d() {
   if (!computed) {
     throw std::runtime_error("No computed data stored");
@@ -359,19 +359,6 @@ Mat2d<float> DepthSensorEngine::getMat2d() {
     Mat2d<float> depth(rows, cols, h_depth);
     return depth;
   }
-}
-
-int DepthSensorEngine::getCudaId() {
-  int cudaId;
-  gpuErrCheck(cudaGetDevice(&cudaId));
-  return cudaId;
-}
-
-void *DepthSensorEngine::getCudaPtr() {
-  if (!computed) {
-    throw std::runtime_error("No computed data stored");
-  }
-  return (registration) ? d_rgbDepth : d_depth;
 }
 
 // DLManagedTensor *DepthSensorEngine::getDLTensor() {
@@ -521,6 +508,78 @@ Mat2d<float> DepthSensorEngine::getPointCloudMat2d() {
 
 //   return tensor;
 // }
+
+int DepthSensorEngine::getCudaId() {
+  int cudaId;
+  gpuErrCheck(cudaGetDevice(&cudaId));
+  return cudaId;
+}
+
+void *DepthSensorEngine::getCudaPtr() {
+  if (!computed) {
+    throw std::runtime_error("No computed data stored");
+  }
+  return (registration) ? d_rgbDepth : d_depth;
+}
+
+void *DepthSensorEngine::getPointCloudCudaPtr() {
+  if (!computed) {
+    throw std::runtime_error("No computed data stored");
+  }
+
+  int localRows = registration ? rgbRows : rows;
+  int localCols = registration ? rgbCols : cols;
+  int localSize = registration ? rgbSize : size;
+  float *d_localDepth = registration ? d_rgbDepth : d_depth;
+
+  // Raise depth to point cloud
+  depth2PointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+      d_localDepth, d_pc, localRows, localCols, mainFx, mainFy, mainSkew, mainCx, mainCy);
+  gpuErrCheck(cudaDeviceSynchronize());
+
+  return d_pc;
+}
+
+Mat2d<float> DepthSensorEngine::getRgbPointCloudMat2d(void *rgbaCuda) {
+  if (!computed) {
+    throw std::runtime_error("No computed data stored");
+  }
+
+  int localRows = registration ? rgbRows : rows;
+  int localCols = registration ? rgbCols : cols;
+  int localSize = registration ? rgbSize : size;
+  float *d_localDepth = registration ? d_rgbDepth : d_depth;
+
+  // Raise depth to point cloud
+  depth2RgbPointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+      d_localDepth, (float *)rgbaCuda, d_rgbPc, localRows, localCols, mainFx, mainFy, mainSkew,
+      mainCx, mainCy);
+  gpuErrCheck(cudaDeviceSynchronize());
+
+  gpuErrCheck(cudaMemcpy(h_rgbPc, d_rgbPc, sizeof(float) * 6 * localSize, cudaMemcpyDeviceToHost));
+  Mat2d<float> rgbPc(localSize, 6, h_rgbPc);
+
+  return rgbPc;
+}
+
+void *DepthSensorEngine::getRgbPointCloudCudaPtr(void *rgbaCuda) {
+  if (!computed) {
+    throw std::runtime_error("No computed data stored");
+  }
+
+  int localRows = registration ? rgbRows : rows;
+  int localCols = registration ? rgbCols : cols;
+  int localSize = registration ? rgbSize : size;
+  float *d_localDepth = registration ? d_rgbDepth : d_depth;
+
+  // Raise depth to point cloud
+  depth2RgbPointCloud<<<(localSize + WARP_SIZE - 1) / (WARP_SIZE), WARP_SIZE, 0, stream1>>>(
+      d_localDepth, (float *)rgbaCuda, d_rgbPc, localRows, localCols, mainFx, mainFy, mainSkew,
+      mainCx, mainCy);
+  gpuErrCheck(cudaDeviceSynchronize());
+
+  return d_rgbPc;
+}
 
 void DepthSensorEngine::setInfraredNoiseParameters(float _speckleShape, float _speckleScale,
                                                    float _gaussianMu, float _gaussianSigma) {

@@ -36,14 +36,11 @@ public:
 
   void compute(Mat2d<uint8_t> left, Mat2d<uint8_t> right);
 
-  void compute(void *leftCuda, void *rightCuda);
-
   // void compute(DLManagedTensor *leftDLMTensor, DLManagedTensor *rightDLMTensor);
 
-  Mat2d<float> getMat2d();
+  void compute(void *leftCuda, void *rightCuda);
 
-  int getCudaId();
-  void *getCudaPtr();
+  Mat2d<float> getMat2d();
 
   // DLManagedTensor *getDLTensor();
 
@@ -55,6 +52,11 @@ public:
 
   // DLManagedTensor *getRgbPointCloudDLTensor(DLManagedTensor *rgbaDLMTensor);
 
+  int getCudaId();
+  void *getCudaPtr();
+  void *getPointCloudCudaPtr();
+  Mat2d<float> getRgbPointCloudMat2d(void *rgbaCuda);
+  void *getRgbPointCloudCudaPtr(void *rgbaCuda);
   uint32_t getInputRows() { return rows; }
   uint32_t getInputCols() { return cols; }
   uint32_t getOutputRows() { return (registration) ? rgbRows : rows; }
