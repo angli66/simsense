@@ -33,8 +33,10 @@ float atomicMinFloat(float *addr, float value) {
 }
 
 __global__
-void initInfraredNoise(curandState_t *states, int seed) {
+void initInfraredNoise(curandState_t *states, int seed, const int size) {
     const int id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (id >= size) { return; }
+    
     curand_init(seed, id, 0, &states[id]);
 }
 
