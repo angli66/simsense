@@ -1,4 +1,4 @@
-> This library has been integrated into [SAPIEN](https://github.com/haosulab/SAPIEN.git). SAPIEN is a state-of-the-art interactive simulation environment. Powered with SimSense and high-speed ray tracing engine, SAPIEN can simulate realistic depth in real time. Check branch `sapien` for more details.
+> This library has been integrated into [SAPIEN](https://github.com/haosulab/SAPIEN.git). SAPIEN is a state-of-the-art interactive simulation environment. Powered with SimSense and high-speed ray tracing engine, SAPIEN can simulate realistic depth in real time. Check https://github.com/haosulab/simsense for more details.
 
 # SimSense: A Real-Time Depth Sensor Simulator
 This is a GPU-accelerated depth sensor simulator for python. The goal of this project is to provide a real-time, adjustable, and off-the-shelf module that can simulate different kinds of real-world depth sensors. Building a reliable and fast depth sensor simulator is vital to closing the sim-to-real gap.
