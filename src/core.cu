@@ -64,8 +64,10 @@ DepthSensorEngine::DepthSensorEngine(
     // Allocate GPU memory
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates0, sizeof(curandState_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates1, sizeof(curandState_t)*size));
-    initInfraredNoise<<<rows, cols, 0, stream1>>>(d_irNoiseStates0, infraredNoiseSeed);
-    initInfraredNoise<<<rows, cols, 0, stream2>>>(d_irNoiseStates1, infraredNoiseSeed + 1);
+    initInfraredNoise<<<(size + WARP_SIZE - 1) / WARP_SIZE, WARP_SIZE, 0, stream1>>>(
+      static_cast<curandState_t *>(d_irNoiseStates0), infraredNoiseSeed, size);
+    initInfraredNoise<<<(size + WARP_SIZE - 1) / WARP_SIZE, WARP_SIZE, 0, stream2>>>(
+      static_cast<curandState_t *>(d_irNoiseStates1), infraredNoiseSeed + 1, size);
 
     gpuErrCheck(cudaMalloc((void **)&d_mapLx, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_mapLy, sizeof(float)*size));
@@ -175,8 +177,10 @@ DepthSensorEngine::DepthSensorEngine(
     // Allocate GPU memory
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates0, sizeof(curandState_t)*size));
     gpuErrCheck(cudaMalloc((void **)&d_irNoiseStates1, sizeof(curandState_t)*size));
-    initInfraredNoise<<<rows, cols, 0, stream1>>>(d_irNoiseStates0, infraredNoiseSeed);
-    initInfraredNoise<<<rows, cols, 0, stream2>>>(d_irNoiseStates1, infraredNoiseSeed + 1);
+    initInfraredNoise<<<(size + WARP_SIZE - 1) / WARP_SIZE, WARP_SIZE, 0, stream1>>>(
+      static_cast<curandState_t *>(d_irNoiseStates0), infraredNoiseSeed, size);
+    initInfraredNoise<<<(size + WARP_SIZE - 1) / WARP_SIZE, WARP_SIZE, 0, stream2>>>(
+      static_cast<curandState_t *>(d_irNoiseStates1), infraredNoiseSeed + 1, size);
 
     gpuErrCheck(cudaMalloc((void **)&d_mapLx, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_mapLy, sizeof(float)*size));

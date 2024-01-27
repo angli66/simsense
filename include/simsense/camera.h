@@ -13,7 +13,7 @@
 namespace simsense {
 
 __global__
-void initInfraredNoise(curandState_t *states, int seed);
+void initInfraredNoise(curandState_t *states, int seed, const int size);
 
 __global__
 void simInfraredNoise(uint8_t *src, uint8_t *dst, curandState_t *states, const int rows, const int cols,
