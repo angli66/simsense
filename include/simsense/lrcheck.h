@@ -2,7 +2,7 @@
 #define SIMSENSE_LRCHECK_H
 
 #include <cmath>
-#include <simsense/config.h>
+#include "config.h"
 
 namespace simsense {
 

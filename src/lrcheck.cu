@@ -1,4 +1,4 @@
-#include <simsense/lrcheck.h>
+#include "simsense/lrcheck.h"
 
 namespace simsense {
 

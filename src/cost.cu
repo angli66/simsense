@@ -1,4 +1,4 @@
-#include <simsense/cost.h>
+#include "simsense/cost.h"
 
 namespace simsense {
 
