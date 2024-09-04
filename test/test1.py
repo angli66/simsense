@@ -22,7 +22,7 @@ right = (plt.imread("img/right1.png") * 255).astype(np.uint8)
 depthSensor = DepthSensor(lr_size, k_l, k_r, l2r, max_depth=1.3)
 result = depthSensor.compute(left, right).copy()
 
-cmap = plt.cm.get_cmap('jet').copy()
+cmap = plt.get_cmap('jet').copy()
 cmap.set_bad(color='black')
 plt.imshow(result, cmap=cmap)
 plt.show()
