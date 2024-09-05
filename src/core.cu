@@ -233,7 +233,9 @@ DepthSensorEngine::DepthSensorEngine(
 
     gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_rgbDepth, sizeof(float)*rgbSize));
-    gpuErrCheck(cudaMalloc((void **)&d_dilatedDepth, sizeof(float)*rgbSize));
+    if (dilation) {
+        gpuErrCheck(cudaMalloc((void **)&d_dilatedDepth, sizeof(float)*rgbSize));
+    }
     h_depth = new float[rgbSize];
 #endif
 
@@ -554,7 +556,9 @@ DepthSensorEngine::~DepthSensorEngine() {
         gpuErrCheck(cudaFree(d_a2));
         gpuErrCheck(cudaFree(d_a3));
         gpuErrCheck(cudaFree(d_rgbDepth));
-        gpuErrCheck(cudaFree(d_dilatedDepth));
+        if (dilation) {
+            gpuErrCheck(cudaFree(d_dilatedDepth));
+        }
     }
     delete h_depth;
 #endif
