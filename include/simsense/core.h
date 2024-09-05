@@ -87,7 +87,7 @@ protected:
     uint8_t *d_rawim0, *d_rawim1, *d_noisyim0, *d_noisyim1, *d_recim0, *d_recim1;
     uint32_t *d_census0, *d_census1;
     cost_t *d_rawcost, *d_hsum, *d_cost, *d_L0, *d_L1, *d_L2, *d_LAll;
-    float *d_leftDisp, *d_filteredDisp, *d_depth, *d_rgbDepth, *h_disp, *h_depth;
+    float *d_leftDisp, *d_filteredDisp, *d_depth, *d_rgbDepth, *d_dilatedDepth, *h_disp, *h_depth;
     uint16_t *d_rightDisp;
     float speckleShape, speckleScale, gaussianMu, gaussianSigma;
     uint8_t censusWidth, censusHeight, bfWidth, bfHeight, p1, p2, uniqRatio, lrMaxDiff, mfSize;

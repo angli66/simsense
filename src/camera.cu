@@ -122,7 +122,7 @@ void depthRegistration(float *rgbDepth, const float *depth, const float *a1, con
 
 // Dilate in a 2x2 region where the original projected location is in the bottom right of this region.
 __global__
-void depthDilation(float *depth, const int rgbRows, const int rgbCols, const float maxDepth) {
+void depthDilation(float *dilatedDepth, float *depth, const int rgbRows, const int rgbCols, const float maxDepth) {
     const int pos = blockIdx.x * blockDim.x + threadIdx.x;
     if (pos >= rgbRows * rgbCols) { return; }
 
@@ -132,19 +132,19 @@ void depthDilation(float *depth, const int rgbRows, const int rgbCols, const flo
 
     // Left
     if (z < maxDepth && x-1 >= 0) {
-        float *ptr = depth + y * rgbCols + x-1;
+        float *ptr = dilatedDepth + y * rgbCols + x-1;
         atomicMinFloat(ptr, z); // Update if occluded
     }
 
     // Top
     if (z < maxDepth && y-1 >= 0) {
-        float *ptr = depth + (y-1) * rgbCols + x;
+        float *ptr = dilatedDepth + (y-1) * rgbCols + x;
         atomicMinFloat(ptr, z); // Update if occluded
     }
 
     // Top-left
     if (z < maxDepth && x-1 >= 0 && y-1 >= 0) {
-        float *ptr = depth + (y-1) * rgbCols + x-1;
+        float *ptr = dilatedDepth + (y-1) * rgbCols + x-1;
         atomicMinFloat(ptr, z); // Update if occluded
     }
 }

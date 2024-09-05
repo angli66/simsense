@@ -33,7 +33,7 @@ void depthRegistration(float *rgbDepth, const float *depth, const float *a1, con
                         float b1, float b2, float b3, const int size, const int rgbRows, const int rgbCols);
 
 __global__
-void depthDilation(float *depth, const int rgbRows, const int rgbCols, const float maxDepth);
+void depthDilation(float *dilatedDepth, float *depth, const int rgbRows, const int rgbCols, const float maxDepth);
 
 __global__
 void correctDepthRange(float *depth, const int size, const float minDepth, const float maxDepth);

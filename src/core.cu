@@ -233,6 +233,7 @@ DepthSensorEngine::DepthSensorEngine(
 
     gpuErrCheck(cudaMalloc((void **)&d_depth, sizeof(float)*size));
     gpuErrCheck(cudaMalloc((void **)&d_rgbDepth, sizeof(float)*rgbSize));
+    gpuErrCheck(cudaMalloc((void **)&d_dilatedDepth, sizeof(float)*rgbSize));
     h_depth = new float[rgbSize];
 #endif
 
@@ -433,10 +434,14 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         initRgbDepth<<<(rgbSize+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_rgbDepth, rgbSize, maxDepth);
         depthRegistration<<<(size+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(
             d_rgbDepth, d_depth, d_a1, d_a2, d_a3, b1, b2, b3, size, rgbRows, rgbCols);
+
+        float *d_finalDepth = d_rgbDepth;
         if (dilation) {
-            depthDilation<<<(rgbSize+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_rgbDepth, rgbRows, rgbCols, maxDepth);
+            gpuErrCheck(cudaMemcpyAsync(d_dilatedDepth, d_rgbDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToDevice));
+            depthDilation<<<(rgbSize+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_dilatedDepth, d_rgbDepth, rgbRows, rgbCols, maxDepth);
+            d_finalDepth = d_dilatedDepth;
         }
-        correctDepthRange<<<(rgbSize+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_rgbDepth, rgbSize, minDepth, maxDepth);
+        correctDepthRange<<<(rgbSize+8*WARP_SIZE-1)/(8*WARP_SIZE), 8*WARP_SIZE, 0, stream1>>>(d_finalDepth, rgbSize, minDepth, maxDepth);
 #ifdef PRINT_RUNTIME
         cudaEventRecord(stop);
         gpuErrCheck(cudaDeviceSynchronize());
@@ -446,7 +451,7 @@ py::array_t<float> DepthSensorEngine::compute(py::array_t<uint8_t> left_ndarray,
         
         // GPU to CPU transfer
         gpuErrCheck(cudaDeviceSynchronize());
-        gpuErrCheck(cudaMemcpy(h_depth, d_rgbDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToHost));
+        gpuErrCheck(cudaMemcpy(h_depth, d_finalDepth, sizeof(float)*rgbSize, cudaMemcpyDeviceToHost));
         Mat2d<float> depth(rgbRows, rgbCols, h_depth);
         
         // Convert from Mat2d to ndarray
@@ -549,6 +554,7 @@ DepthSensorEngine::~DepthSensorEngine() {
         gpuErrCheck(cudaFree(d_a2));
         gpuErrCheck(cudaFree(d_a3));
         gpuErrCheck(cudaFree(d_rgbDepth));
+        gpuErrCheck(cudaFree(d_dilatedDepth));
     }
     delete h_depth;
 #endif
