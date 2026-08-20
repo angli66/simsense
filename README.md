@@ -1,3 +1,5 @@
+
+
 # SimSense: A Real-Time Depth Sensor Simulator
 
 **NOTE: this library only simulates the stereo matching algorithm of a depth sensor, meaning you need to have your own left/right infrared images ready. If you want to simulate depth image from scratch, check out the information below.**
@@ -10,7 +12,7 @@ Based on stereo matching, SimSense encapsulates most of the common algorithms in
 
 Depth by [RealSense D435](https://www.intelrealsense.com/depth-camera-d435/) (Invalid Marked as Black) | Depth by SimSense (Invalid Marked as Dark Blue)
 :-:|:-:
-<img src="doc/result_from_D435.png?" width="424" height="240" /> | <img src="doc/result_from_SimSense.png?" width="424" height="240" />
+<img src="doc/result_from_D435.png" width="424" height="240" /> | <img src="doc/result_from_SimSense.png" width="424" height="240" />
 
 ## Performance
 Experiment settings:
@@ -23,7 +25,7 @@ Experiment settings:
 | w/ Block Cost  | 195.7 FPS          | 124.1 FPS           | 69.4 FPS            |
 
 ## Requirements
-- CUDA ToolKit
+- CUDA Toolkit
 - CMAKE 3.18 or later
 
 CUDA Toolkit needs to be installed to compile .cu source files. Check https://developer.nvidia.com/cuda-downloads for instructions.
@@ -46,7 +48,7 @@ Then, run
 to build and install the package.
 
 ## Pipeline
-![pipeline](doc/pipeline.png?)
+![pipeline](doc/pipeline.png)
 
 ### Infrared Noise Simulation
 This part is optional. Applying infrared noise simulation to infrared input can sometimes enhance the sim-to-real performance. The noise model is derived from [Simulating Kinect Infrared and Depth Images](https://ieeexplore.ieee.org/document/7328728) by Landau et al.
